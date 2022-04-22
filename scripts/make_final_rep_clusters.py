@@ -18,6 +18,7 @@ parser.add_argument("--num_clusters", type=int, default=15)
 parser.add_argument("--distance", type=str, default="euclidean")
 parser.add_argument("--data", type=str, default="full")
 parser.add_argument("--output_prefix", type=str, required=True)
+parser.add_argument("--batch_size", type=int, default=10)
 args = parser.parse_args()
 
 model_name = args.model
@@ -53,18 +54,38 @@ for dataset_info in data.values():
         value["split"] = "train"
         instances.append(value)
 
+batches = []
+i = 0
+while i < len(instances):
+    batches.append(instances[i:i+args.batch_size])
+    i += args.batch_size
+
 print("Computing representations")
 all_representations = None
 i = 0
-for instance in tqdm(instances):
-    inputs = tokenizer.encode(instance["input"], return_tensors="pt").cuda()
-    targets = tokenizer.encode(instance["target"], return_tensors="pt").cuda()
-    model_outputs = model(input_ids=inputs, labels=targets, return_dict=True)
-    representation = model_outputs["encoder_last_hidden_state"].detach().cpu().numpy().mean(1)[0]
-    if all_representations is None:
-        all_representations = numpy.zeros((len(instances), representation.shape[0]))
-    all_representations[i] = representation
-    i += 1
+for batch in tqdm(batches):
+    input_data = tokenizer.batch_encode_plus([instance["input"] for instance in batch],
+                                             return_tensors="pt",
+                                             padding=True)
+    target_data = tokenizer.batch_encode_plus([instance["target"] for instance in batch],
+                                              return_tensors="pt",
+                                              padding=True)
+    # (batch_size, num_tokens)
+    mask = input_data['attention_mask'].cuda()
+    model_outputs = model(input_ids=input_data['input_ids'].cuda(),
+                          attention_mask=mask,
+                          labels=target_data['input_ids'].cuda(),
+                          return_dict=True)
+    # (batch_size, num_tokens, hidden_size)
+    hidden_states = model_outputs["encoder_last_hidden_state"]
+    # (batch_size, hidden_size)
+    pooled_hidden_states = (hidden_states * mask.unsqueeze(-1)).sum(1) / mask.sum(1).unsqueeze(-1)
+    for representation in pooled_hidden_states:
+        representation = representation.detach().cpu().numpy()
+        if all_representations is None:
+            all_representations = numpy.zeros((len(instances), representation.shape[0]))
+        all_representations[i] = representation
+        i += 1
 
 with open(os.path.join(cluster_dir, "final_layer_representations.pkl"), "wb") as outfile:
     pickle.dump(all_representations, outfile)
