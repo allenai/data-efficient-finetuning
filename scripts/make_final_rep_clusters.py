@@ -7,22 +7,41 @@ from collections import defaultdict
 import numpy
 from sklearn.decomposition import PCA
 from sklearn import mixture
-from sklearn.metrics.pairwise import euclidean_distances
+from sklearn.metrics.pairwise import euclidean_distances, cosine_distances
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-#model_name = "google/t5-small-lm-adapt"
-model_name = "t5-small"
-num_clusters = 15
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--model", type=str, required=True)
+parser.add_argument("--num_clusters", type=int, default=15)
+parser.add_argument("--distance", type=str, default="euclidean")
+parser.add_argument("--data", type=str, default="full")
+parser.add_argument("--output_prefix", type=str, required=True)
+args = parser.parse_args()
+
+model_name = args.model
+num_clusters = args.num_clusters
+distance_metric = euclidean_distances if args.distance == "euclidean" else cosine_distances
+data = json.load(open("data/p3_data_simplified.json")) if args.data == "simplified" else json.load(open("data/p3_data.json"))
+
+print(f"Model: {args.model}")
+print(f"Num clusters: {args.num_clusters}")
+print(f"Distance metric: {'euclidean' if args.distance == 'euclidean' else 'cosine'}")
+print(f"P3 Data: {'full' if args.data == 'full' else 'simplified'}")
+
+
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 model.cuda()
 
+cluster_dir = f"{args.output_prefix}/p3_dev_{args.data}_{model_name.replace('/', '_')}_final_layer_{args.distance}_clusters/"
 
-data = json.load(open("p3_data_simplified.json"))
-#data = json.load(open("p3_data.json"))
-cluster_dir = f"/home/pradeepd/data/p3_dev_{model_name.replace('/', '_')}_final_layer_clusters/"
+print(f"Clusters directory: {cluster_dir}")
+
 if not os.path.exists(cluster_dir):
     os.makedirs(cluster_dir)
+
 
 instances = []
 
