@@ -1,10 +1,10 @@
 local transformer_model = "google/t5-small-lm-adapt";
-local epochs = 5;
+local epochs = 10;
 local batch_size = 32;
 local num_gradient_accumulation_steps = 2;
 
-local train_cluster_path = "/home/pradeepd/data/p3_dev_google_t5-small-lm-adapt_final_layer_clusters/cluster_0_indices.pkl";
-local dev_cluster_path = "/home/pradeepd/data/p3_dev_google_t5-small-lm-adapt_final_layer_clusters/cluster_0_indices.pkl";
+local train_cluster_path = "/home/pradeepd/data/p3_dev_google_t5-small-lm-adapt_final_layer_clusters/cluster_4_indices.pkl";
+local dev_cluster_path = "/home/pradeepd/data/p3_dev_google_t5-small-lm-adapt_final_layer_clusters/cluster_4_indices.pkl";
 local p3_data_path = "data/p3_data_simplified_with_options.json";
 
 local num_gpus = 1;
