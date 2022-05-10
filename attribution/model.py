@@ -44,6 +44,7 @@ class BasicSeq2Seq(Model):
 
         # (batch_size, num_options, answer_length)
         answer_option_ids = util.get_token_ids_from_text_field_tensors(answer_options)
+        answer_option_ids[answer_option_ids == 0] = -100
         # (batch_size, answer_length)
         correct_answer_ids = answer_option_ids[
                 torch.arange(answer_option_ids.shape[0]),
