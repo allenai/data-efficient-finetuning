@@ -62,6 +62,8 @@ class P3ClusterReader(DatasetReader):
                     self._stats["Instances with too many options"] += 1
                 elif instance_info["target"] not in instance_info["options"]:
                     self._stats["Target not in options"] += 1
+                elif not instance_info["is_correct"]:
+                    self._stats["Instance has incorrect answer"] += 1
                 else:
                     yield self.text_to_instance(
                             instance_info["input"],
