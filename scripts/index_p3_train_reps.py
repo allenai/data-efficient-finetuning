@@ -97,27 +97,14 @@ with torch.inference_mode():
         input_data = tokenizer.batch_encode_plus([instance["input"] for instance in batch],
                                                  return_tensors="pt",
                                                  padding=True)
-        """
-        target_data = tokenizer.batch_encode_plus([instance["target"] for instance in batch],
-                                                  return_tensors="pt",
-                                                  padding=True)
-        """
         input_ids = input_data['input_ids'].cuda()
-        #labels = target_data['input_ids'].cuda()
         # (batch_size, num_tokens)
         mask = input_data['attention_mask'].cuda()
 
-        """
-        model_outputs = model(input_ids=input_ids,
-                              attention_mask=mask,
-                              labels=labels,
-                              return_dict=True)
-        """
         encoder_outputs = parallel_encoder(input_ids=input_ids,
                                            attention_mask=mask,
                                            return_dict=True)
         # (batch_size, num_tokens, hidden_size)
-        #hidden_states = model_outputs["encoder_last_hidden_state"]
         hidden_states = encoder_outputs["last_hidden_state"]
         # (batch_size, hidden_size)
         pooled_hidden_states = (hidden_states * mask.unsqueeze(-1)).sum(1) / mask.sum(1).unsqueeze(-1)
