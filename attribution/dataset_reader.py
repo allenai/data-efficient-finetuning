@@ -55,6 +55,12 @@ class P3ClusterReader(DatasetReader):
         cluster_data = pickle.load(open(file_path, "rb"))
         for dataset_name, cluster_info in cluster_data.items():
             for instance_id in cluster_info[self._split_name]:
+                if dataset_name not in self._p3_data:
+                    self._stats["Instances skipped due to missing dataset partitions"] += 1
+                    continue
+                if str(instance_id) not in self._p3_data[dataset_name][self._split_name]:
+                    self._stats["Instances skipped due to missing instance ids"] += 1
+                    continue
                 instance_info = self._p3_data[dataset_name][self._split_name][str(instance_id)]
                 if len(instance_info["options"]) <= 1:
                     self._stats["Instances without multiple options"] += 1
