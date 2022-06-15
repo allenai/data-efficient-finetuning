@@ -5,3 +5,4 @@ protobuf==3.20.0
 scikit-learn==1.0.2
 allennlp==2.9.3
 overrides==6.1.0
+faiss-gpu==1.7.2

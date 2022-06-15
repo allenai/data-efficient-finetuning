@@ -12,14 +12,16 @@ import torch
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, required=True)
 parser.add_argument("--output_prefix", type=str, required=True)
-parser.add_argument("--batch_size", type=int, default=10)
 parser.add_argument("--index_type", type=str, default="hnsw")
-parser.add_argument("--add_interval", type=int, default=10, help="Each index.add() will add add_interval * batch_size points")
+parser.add_argument("--max_batch_tokens", type=int, default=32000)
+parser.add_argument("--add_interval", type=int, default=1000, help="Each index.add() will add add_interval points")
 parser.add_argument("--write_interval", type=int, default=2000000, help="Each time after indexing roughly these many points the index will be written to disk")
 parser.add_argument("--neighbors_per_node", type=int, default=512, help="HNSW parameter, default from DPR paper")
 parser.add_argument("--construction_depth", type=int, default=200, help="HNSW parameter, default from DPR paper")
 parser.add_argument("--search_depth", type=int, default=128, help="HNSW parameter, default from DPR paper")
+parser.add_argument("--encoding_dim", type=int, default=512, help="Reduced dimensionality for OPQ")
 parser.add_argument("--sq_train_size", type=int, default=1000000)
+parser.add_argument("--device_ids", type=int, nargs="+")
 args = parser.parse_args()
 
 with open(os.path.join(args.output_prefix, "hyperparameters.json"), "w") as outfile:
@@ -28,6 +30,7 @@ with open(os.path.join(args.output_prefix, "hyperparameters.json"), "w") as outf
                 "neighbors_per_node": args.neighbors_per_node,
                 "construction_depth": args.construction_depth,
                 "search_depth": args.search_depth,
+                "encoding_dim": args.encoding_dim,
                 "sq_train_size": args.sq_train_size
             }, outfile)
 
@@ -39,10 +42,10 @@ tokenizer = AutoTokenizer.from_pretrained(args.model)
 model = AutoModelForSeq2SeqLM.from_pretrained(args.model)
 model.eval()
 if torch.cuda.is_available():
-    model.cuda()
-    num_gpus_available = torch.cuda.device_count()
-    print(f"Using DataParallel for the encoder on {num_gpus_available} GPUs")
-    encoder = torch.nn.DataParallel(model.encoder, device_ids=list(range(num_gpus_available)))
+    model.cuda(device=args.device_ids[0])
+    num_gpus_available = len(args.device_ids)
+    print(f"Using DataParallel for the encoder on {num_gpus_available} GPUs with ids {args.device_ids}")
+    encoder = torch.nn.DataParallel(model.encoder, device_ids=args.device_ids)
 else:
     encoder = model.encoder
 
@@ -51,17 +54,25 @@ if text_instances_file.endswith(".gz"):
 else:
     instances_file_ptr = open(text_instances_file, "r")
 
-def get_batches():
+def get_batches(num_instances_to_skip: int=0):
     batch = []
     num_batch_tokens = 0
-    max_num_batch_tokens = 213 * 75
-    num_batches_yield = 0
+    max_num_batch_tokens = args.max_batch_tokens
+    num_batches_yielded = 0
     num_instances_yielded = 0
     num_truncated_instances = 0
+    num_instances_read = 0
+    started_batching = False
     while True:
         line = instances_file_ptr.readline()
         if not line:
             break
+        num_instances_read += 1
+        if num_instances_read <= num_instances_to_skip:
+            continue
+        if not started_batching:
+            print(f"Starting to batch instances from instance number: {num_instances_read}")
+            started_batching = True
         instance = json.loads(line)
         input_ = instance["input"]
         tokens = tokenizer.tokenize(input_)
@@ -70,11 +81,12 @@ def get_batches():
             num_truncated_instances += 1
         if num_tokens + num_batch_tokens < max_num_batch_tokens:
             batch.append(input_)
+            num_batch_tokens += num_tokens
         else:
             yield batch
             num_instances_yielded += len(batch)
             num_batches_yielded += 1
-            if num_batches_yielded % 1000 == 0:
+            if num_batches_yielded % 10000 == 0:
                 print(f"Average batch size: {num_instances_yielded / num_batches_yielded}")
                 print(f"Truncated instances so far: {num_truncated_instances}")
             batch = [input_]
@@ -84,7 +96,11 @@ def get_batches():
         print(f"Average batch size: {num_instances_yielded / num_batches_yielded}")
         print(f"Truncated instances so far: {num_truncated_instances}")
 
-index_file = os.path.join(args.output_prefix, "p3_train_final_layer_rep_8bit_qt8.index")
+index_factory_string = f"OPQ8_{args.encoding_dim},HNSW{args.neighbors_per_node},PQ8"
+index_file = os.path.join(
+        args.output_prefix,
+        f"p3_{args.model.replace('/', '-')}_{index_factory_string.replace(',', '-')}.index"
+)
 index = None
 last_written_index_size = 0
 if os.path.exists(index_file):
@@ -92,21 +108,14 @@ if os.path.exists(index_file):
     index = faiss.read_index(index_file)
     last_written_index_size = index.ntotal
     print(f"Done reading index of size {last_written_index_size}")
+else:
+    print(f"Will write index to {index_file}")
 
-num_instances_read = 0
-started_encoding = False
 aggregated_encoded_batches = []
 
 print("Computing representations and indexing them")
 with torch.inference_mode():
-    for batch in tqdm.tqdm(get_batches()):
-        num_instances_read += len(batch)
-        if num_instances_read < last_written_index_size:
-            continue
-        if not started_encoding:
-            started_encoding = True
-            print(f"Starting encoding after reading {num_instances_read} instances")
-
+    for batch in tqdm.tqdm(get_batches(last_written_index_size)):
         input_data = tokenizer.batch_encode_plus(batch,
                                                  return_tensors="pt",
                                                  padding=True,
@@ -115,8 +124,8 @@ with torch.inference_mode():
         # (batch_size, num_tokens)
         mask = input_data['attention_mask']
         if torch.cuda.is_available():
-            input_ids = input_ids.cuda()
-            mask = mask.cuda()
+            input_ids = input_ids.cuda(device=args.device_ids[0])
+            mask = mask.cuda(device=args.device_ids[0])
 
         encoder_outputs = encoder(input_ids=input_ids,
                                   attention_mask=mask,
@@ -129,18 +138,20 @@ with torch.inference_mode():
         aggregated_encoded_batches.append(pooled_hidden_states_np)
         if index is None:
             hidden_size = pooled_hidden_states_np.shape[1]
-            index = faiss.IndexHNSWSQ(hidden_size, faiss.ScalarQuantizer.QT_8bit, args.neighbors_per_node)
-            index.hnsw.efConstruction = args.construction_depth
-            index.hnsw.efSearch = args.search_depth
+            #index = faiss.IndexHNSWSQ(hidden_size, faiss.ScalarQuantizer.QT_8bit, args.neighbors_per_node)
+            index = faiss.index_factory(hidden_size, index_factory_string)
+            #index.hnsw.efConstruction = args.construction_depth
+            #index.hnsw.efSearch = args.search_depth
 
-        if not index.is_trained and (len(aggregated_encoded_batches) * args.batch_size) >= args.sq_train_size:
+        if not index.is_trained and sum([x.shape[0] for x in aggregated_encoded_batches]) >= args.sq_train_size:
             print("Training index")
             data_to_train = numpy.concatenate(aggregated_encoded_batches)
             index.train(data_to_train)
 
-        if index.is_trained and len(aggregated_encoded_batches) >= args.add_interval:
+        if index.is_trained and sum([x.shape[0] for x in aggregated_encoded_batches]) >= args.add_interval:
             data_to_add = numpy.concatenate(aggregated_encoded_batches)
             index.add(data_to_add)
+            print(f"Added {data_to_add.shape[0]} points to index")
             aggregated_encoded_batches = []
             index_size = index.ntotal
             if index_size - last_written_index_size >= args.write_interval:
@@ -151,5 +162,6 @@ with torch.inference_mode():
     if aggregated_encoded_batches:
         data_to_add = numpy.concatenate(aggregated_encoded_batches)
         index.add(data_to_add)
+        print(f"Added {data_to_add.shape[0]} points to index")
 
     faiss.write_index(index, index_file)
