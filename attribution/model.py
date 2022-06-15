@@ -18,7 +18,7 @@ class BasicSeq2Seq(Model):
     def __init__(
         self,
         vocab: Vocabulary,
-        model_name: str = 'google/t5-small-lm-adapt',
+        model_name: str = 'google/t5-xl-lm-adapt',
         compute_accuracy: bool = False,
         fake_training: bool = False,
         **kwargs
