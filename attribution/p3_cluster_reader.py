@@ -47,10 +47,11 @@ class P3ClusterReader(DatasetReader):
             "tokens": PretrainedTransformerIndexer(model_name)
         }
         self._max_query_length = max_query_length
-        self._stats = defaultdict(int)
+        self._stats = None
 
     @overrides
     def _read(self, file_path: str) -> Iterable[Instance]:
+        self._stats = defaultdict(int)
         logger.info("Reading the cluster file")
         cluster_data = pickle.load(open(file_path, "rb"))
         for dataset_name, cluster_info in cluster_data.items():

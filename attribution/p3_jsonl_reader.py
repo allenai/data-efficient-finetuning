@@ -43,24 +43,25 @@ class P3ClusterReader(DatasetReader):
             "tokens": PretrainedTransformerIndexer(model_name)
         }
         self._max_query_length = max_query_length
-        self._stats = defaultdict(int)
+        self._stats = None
 
     @overrides
     def _read(self, file_path: str) -> Iterable[Instance]:
+        self._stats = defaultdict(int)
         logger.info(f"Reading data from {file_path}")
         for line in open(file_path):
             instance_data = json.loads(line)
             if "target" not in instance_data or "input" not in instance_data:
                 self._stats["Instances without inputs or targets (skipped)"] += 1
                 continue
-            if "answer_options" not in instance_data:
+            if "answer_choices" not in instance_data:
                 self._stats["Instances without answer options (kept)"] += 1
-                answer_options = [instance["target"]]
-            elif instance["target"] not in instance["answer_choices"]:
+                answer_options = [instance_data["target"]]
+            elif instance_data["target"] not in instance_data["answer_choices"]:
                 self._stats["Instances with targets not in answer choices (skipped)"] += 1
                 continue
             else:
-                answer_options = instance["answer_choices"]
+                answer_options = instance_data["answer_choices"]
             yield self.text_to_instance(
                 instance_data["input"],
                 instance_data["target"],
