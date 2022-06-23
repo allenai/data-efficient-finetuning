@@ -21,10 +21,13 @@ class BasicSeq2Seq(Model):
         model_name: str = 'google/t5-xl-lm-adapt',
         compute_accuracy: bool = False,
         fake_training: bool = False,
+        gradient_checkpointing: bool=False,
         **kwargs
     ):
         super().__init__(vocab, **kwargs)
         self.transformer = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        if gradient_checkpointing:
+            self.transformer.gradient_checkpointing_enable()
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self._compute_accuracy = compute_accuracy
         self._accuracy = Average()
