@@ -54,16 +54,21 @@ class P3ClusterReader(DatasetReader):
             if "target" not in instance_data or "input" not in instance_data:
                 self._stats["Instances without inputs or targets (skipped)"] += 1
                 continue
+            if not isinstance(instance_data["target"], str):
+                self._stats["Instances whose targets are not strings (skipped)"] += 1
+                continue
+            target = instance_data["target"].strip()
             if "answer_choices" not in instance_data:
                 self._stats["Instances without answer options (kept)"] += 1
-                answer_options = [instance_data["target"]]
+                answer_options = [target]
             else:
                 answer_options = [c.strip() for c in instance_data["answer_choices"]]
-                if instance_data["target"] not in answer_options:
+                if target not in answer_options:
+                    answer_options.append(target)
                     self._stats["Instances with targets not in answer choices (kept)"] += 1
             yield self.text_to_instance(
                 instance_data["input"],
-                instance_data["target"],
+                target,
                 answer_options
             )
 
@@ -96,7 +101,7 @@ class P3ClusterReader(DatasetReader):
 
         answer_index = None
         for i, option in enumerate(options):
-            if option == target:
+            if target in option:
                 answer_index = i
                 break
         fields["correct_answer_index"] = IndexField(answer_index, options_list_field)
