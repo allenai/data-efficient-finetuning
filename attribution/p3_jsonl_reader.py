@@ -57,11 +57,10 @@ class P3ClusterReader(DatasetReader):
             if "answer_choices" not in instance_data:
                 self._stats["Instances without answer options (kept)"] += 1
                 answer_options = [instance_data["target"]]
-            elif instance_data["target"] not in instance_data["answer_choices"]:
-                self._stats["Instances with targets not in answer choices (skipped)"] += 1
-                continue
             else:
-                answer_options = instance_data["answer_choices"]
+                answer_options = [c.strip() for c in instance_data["answer_choices"]]
+                if instance_data["target"] not in answer_options:
+                    self._stats["Instances with targets not in answer choices (kept)"] += 1
             yield self.text_to_instance(
                 instance_data["input"],
                 instance_data["target"],
