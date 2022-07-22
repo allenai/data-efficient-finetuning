@@ -101,10 +101,6 @@ class BasicSeq2Seq(Model):
                 if correct_option_id == self._relevant_label_index:
                     self._recall(correct_option_id == best_option_id)
 
-                for key, value in instance_metadata.items():
-                    if key not in output_dict:
-                        output_dict[key] = []
-                    output_dict[key].append(value)
                 output_dict['response'].append(best_option_id)
 
         return output_dict
