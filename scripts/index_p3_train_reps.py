@@ -1,4 +1,3 @@
-from datasets import load_from_disk
 import json
 import os
 import tqdm
@@ -138,10 +137,12 @@ with torch.inference_mode():
         aggregated_encoded_batches.append(pooled_hidden_states_np)
         if index is None:
             hidden_size = pooled_hidden_states_np.shape[1]
-            #index = faiss.IndexHNSWSQ(hidden_size, faiss.ScalarQuantizer.QT_8bit, args.neighbors_per_node)
             index = faiss.index_factory(hidden_size, index_factory_string)
-            #index.hnsw.efConstruction = args.construction_depth
-            #index.hnsw.efSearch = args.search_depth
+            # We cannot access the HNSW parameters directly. `index` is of type IndexPreTransform. We need to downcast
+            # the actual index to do this.
+            hnswpq_index = faiss.downcast_index(index.index)
+            hnswpq_index.hnsw.efConstruction = args.construction_depth
+            hnswpq_index.hnsw.efSearch = args.search_depth
 
         if not index.is_trained and sum([x.shape[0] for x in aggregated_encoded_batches]) >= args.sq_train_size:
             print("Training index")
