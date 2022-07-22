@@ -19,7 +19,7 @@ class BasicSeq2Seq(Model):
         self,
         vocab: Vocabulary,
         model_name: str = 'google/t5-xl-lm-adapt',
-        compute_test_metrics: bool = False,
+        compute_test_metrics: bool = True,
         fake_training: bool = False,
         gradient_checkpointing: bool=False,
         relevant_label_index: int=None,
