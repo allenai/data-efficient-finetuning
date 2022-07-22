@@ -19,9 +19,10 @@ class BasicSeq2Seq(Model):
         self,
         vocab: Vocabulary,
         model_name: str = 'google/t5-xl-lm-adapt',
-        compute_accuracy: bool = False,
+        compute_test_metrics: bool = False,
         fake_training: bool = False,
         gradient_checkpointing: bool=False,
+        relevant_label_index: int=None,
         **kwargs
     ):
         super().__init__(vocab, **kwargs)
@@ -29,8 +30,12 @@ class BasicSeq2Seq(Model):
         if gradient_checkpointing:
             self.transformer.gradient_checkpointing_enable()
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self._compute_accuracy = compute_accuracy
+        self._compute_test_metrics = compute_test_metrics
         self._accuracy = Average()
+        # We use this to compute precision and recall. If not set, precision and recall will be 0.
+        self._relevant_label_index = relevant_label_index
+        self._precision = Average()
+        self._recall = Average()
         self._fake_training = fake_training
         if self._fake_training:
             logger.info("Faking training. This will only dump the pretrained transformer into a model archive.")
@@ -65,12 +70,13 @@ class BasicSeq2Seq(Model):
         if self._fake_training:
             loss = loss * 0.0
 
-        output_dict = {'loss': loss}
-        if not self.training and self._compute_accuracy:
+        output_dict = {'loss': loss, 'response': []}
+        if not self.training and self._compute_test_metrics:
             batch_size, num_options, _ = answer_option_ids.shape
             for i in range(batch_size):
                 instance_input_ids = input_ids[i:i+1]
                 instance_attention_mask = attention_mask[i:i+1]
+                instance_metadata = metadata[i]
                 correct_option_id = correct_answer_index[i].detach().cpu()[0]
                 min_loss = None
                 best_option_id = None
@@ -89,8 +95,24 @@ class BasicSeq2Seq(Model):
                         min_loss = option_loss
                         best_option_id = j
                 self._accuracy(correct_option_id == best_option_id)
+                if best_option_id == self._relevant_label_index:
+                    self._precision(correct_option_id == best_option_id)
+
+                if correct_option_id == self._relevant_label_index:
+                    self._recall(correct_option_id == best_option_id)
+
+                for key, value in instance_metadata.items():
+                    if key not in output_dict:
+                        output_dict[key] = []
+                    output_dict[key].append(value)
+                output_dict['response'].append(best_option_id)
+
         return output_dict
 
     @overrides
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:
-        return {"accuracy": self._accuracy.get_metric(reset)}
+        return {
+            "accuracy": self._accuracy.get_metric(reset),
+            "precision": self._precision.get_metric(reset),
+            "recall": self._recall.get_metric(reset),
+        }

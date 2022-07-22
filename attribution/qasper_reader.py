@@ -101,7 +101,8 @@ class QasperEvidencePromptReader(DatasetReader):
                     "paragraph": paragraph,
                     "paragraph_index": paragraph_index,
                     "query": input_,
-                    "target": target
+                    "target": target,
+                    "answer_options": self._answer_options
                 }
                 yield self.text_to_instance(
                     input_,
