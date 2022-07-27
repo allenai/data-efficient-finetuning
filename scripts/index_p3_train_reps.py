@@ -23,7 +23,10 @@ parser.add_argument("--sq_train_size", type=int, default=1000000)
 parser.add_argument("--device_ids", type=int, nargs="+")
 args = parser.parse_args()
 
-with open(os.path.join(args.output_prefix, "hyperparameters.json"), "w") as outfile:
+index_factory_string = f"OPQ8_{args.encoding_dim},HNSW{args.neighbors_per_node},PQ8"
+index_prefix = f"p3_{args.model.replace('/', '-')}_{index_factory_string.replace(',', '-')}"
+
+with open(os.path.join(args.output_prefix, f"{index_prefix}_hyperparameters.json"), "w") as outfile:
     json.dump(
             {
                 "neighbors_per_node": args.neighbors_per_node,
@@ -33,7 +36,7 @@ with open(os.path.join(args.output_prefix, "hyperparameters.json"), "w") as outf
                 "sq_train_size": args.sq_train_size
             }, outfile)
 
-text_instances_file = os.path.join(args.output_prefix, "p3_train_instances_shuffled.jsonl")
+text_instances_file = os.path.join(args.output_prefix, "p3_train_instances_shuffled.jsonl.gz")
 
 assert os.path.exists(text_instances_file), "Text instances file does not exist!"
 
@@ -49,7 +52,7 @@ else:
     encoder = model.encoder
 
 if text_instances_file.endswith(".gz"):
-    instances_file_ptr = gzip.open(text_instances_file, "rb")
+    instances_file_ptr = gzip.open(text_instances_file, "rt")
 else:
     instances_file_ptr = open(text_instances_file, "r")
 
@@ -95,10 +98,9 @@ def get_batches(num_instances_to_skip: int=0):
         print(f"Average batch size: {num_instances_yielded / num_batches_yielded}")
         print(f"Truncated instances so far: {num_truncated_instances}")
 
-index_factory_string = f"OPQ8_{args.encoding_dim},HNSW{args.neighbors_per_node},PQ8"
 index_file = os.path.join(
         args.output_prefix,
-        f"p3_{args.model.replace('/', '-')}_{index_factory_string.replace(',', '-')}.index"
+        f"{index_prefix}.index"
 )
 index = None
 last_written_index_size = 0

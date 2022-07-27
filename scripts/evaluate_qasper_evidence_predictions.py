@@ -19,9 +19,9 @@ for paper_data in data.values():
 predictions = {}
 for line in open(args.predictions):
     datum = json.loads(line)
-    question_ids = [datum["question_id"]] if isinstance(datum["question_id"], str) else datum["question_id"]
-    paragraphs = [datum["paragraph"]] if isinstance(datum["paragraph"], str) else datum["paragraph"]
-    answer_choices = datum["metadata"][0]["answer_choices"]
+    question_ids = [d["question_id"] for d in datum["metadata"]]
+    paragraphs = [d["paragraph"] for d in datum["metadata"]]
+    answer_choices = datum["metadata"][0]["answer_options"]
     response_indices = datum["response"]
     responses = [answer_choices[i] for i in response_indices]
 
