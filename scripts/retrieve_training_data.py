@@ -1,5 +1,7 @@
 import argparse
 import faiss
+import numpy
+from sklearn.cluster import kmeans_plusplus
 import torch
 import json
 import gzip
@@ -24,6 +26,7 @@ parser.add_argument("--p3_data", type=str, help="If provided, will write trainin
 parser.add_argument("--training_data", type=str)
 parser.add_argument("--num_neighbors_write", type=int, default=20)
 parser.add_argument("--write_positive_neighbors_only", action="store_true", help="If set, will write neighbors of positive dev instances alone")
+parser.add_argument("--coreset_size", type=int, default=None, help="If set, will use KMeans++ to select these many diverse points")
 parser.add_argument("--p3_dataset_indices", type=str, help="If provided, will compute P3 dataset stats")
 parser.add_argument("--stats_log", type=str, help="File to write the dataset stats")
 parser.add_argument("--cuda_devices", type=int, nargs="+")
@@ -31,6 +34,7 @@ args = parser.parse_args()
 
 
 indices_frequencies = defaultdict(int)
+index = None
 if not os.path.exists(args.search_output):
     assert args.dev_data is not None
     assert args.index is not None
@@ -94,6 +98,21 @@ else:
         if not args.write_positive_neighbors_only or "Yes" in datum["target"]:
             for id_ in datum["ids"][:args.num_neighbors_write]:
                 indices_frequencies[id_] += 1
+
+if args.coreset_size is not None:
+    print(f"Filtering down the retrieved training set to {args.coreset_size} points")
+    if index is None:
+        print("Loading index..")
+        index = faiss.read_index(args.index)
+        print("Done loading index")
+    retrieved_indices = list(indices_frequencies.keys())
+    # Inner index
+    retrieved_vectors = numpy.asarray([index.index.reconstruct(i) for i in retrieved_indices])
+    _, coreset_indices = kmeans_plusplus(retrieved_vectors, args.coreset_size)
+    print("Finished running KMeans++")
+    selected_indices = [retrieved_indices[i] for i in coreset_indices]
+    indices_frequencies = {i: indices_frequencies[i] for i in selected_indices}
+
 
 max_freq_indices = sorted(indices_frequencies.items(), key=lambda x: x[1], reverse=True)[:10]
 print(f"\nMost frequent indices: {max_freq_indices}")
