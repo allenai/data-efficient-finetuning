@@ -21,6 +21,7 @@ parser.add_argument("--index", type=str)
 parser.add_argument("--model", type=str)
 parser.add_argument("--encoding_batch_size", type=int)
 parser.add_argument("--sorted_training_data", type=str)
+parser.add_argument("--output_separate_files", action="store_true", help="write output after each iteration of kmeans++ ")
 parser.add_argument("--training_data_distances", type=str)
 parser.add_argument("--acquisition_batch_size", type=int, default=1000)
 args = parser.parse_args()
@@ -130,21 +131,24 @@ training_data_distances = training_data_distances * (training_data_distances >= 
 num_training_points = len(training_distances_from_dev_retrieved)
 selection_pool = list(range(num_training_points))
 
-uniform_entropy = entropy([1./num_training_points] * num_training_points)
-print(f"Entopy of uniform distribution: {uniform_entropy}")
+if args.output_separate_files:
+    outfile_prefix = args.sorted_training_data.replace(".jsonl", "")
+else:
+    outfile = open(args.sorted_training_data, "w")
 
+training_data_lines = open(args.training_data).readlines()
 with tqdm.tqdm(total=num_training_points) as pbar:
+    set_index = 0
     while selection_pool:
+        if args.output_separate_files:
+            outfile = open(f"{outfile_prefix}_set{set_index}.jsonl", "w")
         if len(selection_pool) <= args.acquisition_batch_size:
             next_points = selection_pool
         else:
-            # Computing a softmax over the distances to use as the probability distribution to sample from.
-            # It is kind of expensive to compute a softmax over an array of the size of training data.
-            #exp_distances = numpy.exp(min_distances)
-            #distance_distribution = exp_distances / numpy.sum(exp_distances)
             distance_distribution = distances_to_selected / numpy.sum(distances_to_selected)
 
-            print(f"Entropy: {entropy(distance_distribution)}")
+            uniform_entropy = entropy([1./len(selection_pool)] * len(selection_pool))
+            print(f"Entropy: {entropy(distance_distribution)} (uniform: {uniform_entropy})")
             next_points = numpy.random.choice(
                     selection_pool,
                     args.acquisition_batch_size,
@@ -168,10 +172,14 @@ with tqdm.tqdm(total=num_training_points) as pbar:
         selection_pool = next_pool
         distances_to_selected = numpy.asarray(next_distances)
 
+        if args.output_separate_files:
+            for ind in sorted_training_indices:
+                print(training_data_lines[ind].strip(), file=outfile)
+
+        set_index += 1
         pbar.update(len(next_points))
 
 
-lines = open(args.training_data).readlines()
-with open(args.sorted_training_data, "w") as outfile:
+if not args.output_separate_files:
     for ind in sorted_training_indices:
-        print(lines[ind].strip(), file=outfile)
+        print(training_data_lines[ind].strip(), file=outfile)
