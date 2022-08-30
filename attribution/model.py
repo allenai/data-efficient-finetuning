@@ -9,6 +9,7 @@ from allennlp.nn import util
 from allennlp.data import TextFieldTensors, Vocabulary
 from allennlp.models import Model
 from allennlp.training.metrics import Average
+from allennlp.models.archival import load_archive
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +21,18 @@ class BasicSeq2Seq(Model):
         vocab: Vocabulary,
         model_name: str = 'google/t5-xl-lm-adapt',
         compute_test_metrics: bool = True,
-        fake_training: bool = False,
-        gradient_checkpointing: bool=False,
         relevant_label_index: int=None,
+        gradient_checkpointing: bool=False,
+        fake_training: bool = False,
+        archive_for_initialization: str = None,
         **kwargs
     ):
         super().__init__(vocab, **kwargs)
-        self.transformer = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        if archive_for_initialization:
+            archive = load_archive(archive_for_initialization)
+            self.transformer = archive.model.transformer
+        else:
+            self.transformer = AutoModelForSeq2SeqLM.from_pretrained(model_name)
         if gradient_checkpointing:
             self.transformer.gradient_checkpointing_enable()
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
