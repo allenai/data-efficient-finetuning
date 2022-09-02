@@ -18,7 +18,7 @@ class IA3Linear(nn.Module):
         self.weight = linear_layer.weight
         self.bias = linear_layer.bias
         self.ia3_vector = nn.Parameter(
-            torch.ones(self.scaling_rank, linear_layer.in_features)
+            torch.ones(1, linear_layer.in_features)
         )
 
     def forward(self, input):

@@ -1,17 +1,9 @@
-from typing import Any, Dict, List
-from overrides import overrides
 import logging
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-import torch
-
-from allennlp.nn import util
-from allennlp.data import TextFieldTensors, Vocabulary
 from allennlp.models import Model
-from allennlp.training.metrics import Average
 
-from model import BasicSeq2Seq
-from ia3 import modify_with_lora
+from attribution.model import BasicSeq2Seq
+from attribution.ia3 import modify_with_lora
 
 logger = logging.getLogger(__name__)
 
