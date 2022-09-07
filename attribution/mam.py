@@ -228,7 +228,6 @@ class T5AttentionPrefixTuning(nn.Module):
             self.stored_key_value_states = None
 
 
-# TODO: set the parameters via config
 def modify_with_mam(transformer: PreTrainedModel, adapter_size: int, num_prefix_tokens: int, prefix_reparam_hidden_size: int):
     # prefix setup
     hidden_size = prefix_reparam_hidden_size
@@ -249,20 +248,24 @@ def modify_with_mam(transformer: PreTrainedModel, adapter_size: int, num_prefix_
     return transformer
 
 
+# MaM adapter model
+# defaults from "toward unified view of parameter efficient learning"
+# https://arxiv.org/abs/2110.04366
 @Model.register("mam_seq2seq")
 class MaMSeq2Seq(BasicSeq2Seq):
     def __init__(
         self,
+        adapter_size: int = 512,
+        num_prefix_tokens: int = 30,
+        prefix_reparam_hidden_size: int = 512,
         **kwargs
     ):
         super().__init__(**kwargs)
-        # settings from "toward unified view of parameter efficient learning"
-        # https://arxiv.org/abs/2110.04366
         self.transformer = modify_with_mam(
             self.transformer,
-            512,
-            30,
-            512
+            adapter_size,
+            num_prefix_tokens,
+            prefix_reparam_hidden_size
         )
         # only train lora parameters
         for name, param in self.transformer.named_parameters():
