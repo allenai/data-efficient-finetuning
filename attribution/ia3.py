@@ -2,12 +2,17 @@
 Adapted from t-few repo:
 https://github.com/r-three/t-few/blob/master/src/models/lora.py
 """
+import re
+import logging
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import re
 from transformers import PreTrainedModel
+
+from attribution.model import BasicSeq2Seq
+
+logger = logging.getLogger(__name__)
 
 
 class IA3Linear(nn.Module):
@@ -30,7 +35,7 @@ class IA3Linear(nn.Module):
         )
 
 
-def modify_with_lora(transformer: PreTrainedModel, lora_modules: str, lora_layers: str):
+def modify_with_ia3(transformer: PreTrainedModel, lora_modules: str, lora_layers: str):
     for m_name, module in dict(transformer.named_modules()).items():
         if re.fullmatch(lora_modules, m_name):
             for c_name, layer in dict(module.named_children()).items():
@@ -44,3 +49,24 @@ def modify_with_lora(transformer: PreTrainedModel, lora_modules: str, lora_layer
                         IA3Linear(layer),
                     )
     return transformer
+
+
+@Model.register("ia3_seq2seq")
+class IA3BasicSeq2Seq(BasicSeq2Seq):
+    def __init__(
+        self,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        # regex from https://github.com/r-three/t-few/blob/master/configs/ia3.json
+        self.transformer = modify_with_ia3(
+            self.transformer,
+            ".*SelfAttention|.*EncDecAttention|.*DenseReluDense",
+            "k|v|wi_1.*"
+        )
+        # only train ia3 parameters
+        for name, param in self.transformer.named_parameters():
+            if "ia3" in name:
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
