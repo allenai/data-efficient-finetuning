@@ -235,7 +235,7 @@ def modify_with_mam(transformer: PreTrainedModel, adapter_size: int, num_prefix_
     num_prefix_tokens = num_prefix_tokens
     adapter_size = adapter_size
     shared = {
-        "prefix_emb": nn.Embedding(30, transformer.config.d_model),
+        "prefix_emb": nn.Embedding(num_prefix_tokens, transformer.config.d_model),
         "prefix_linear": nn.Linear(transformer.config.d_model, hidden_size),
     }
     # attention modules become prefix, ff become adapter
