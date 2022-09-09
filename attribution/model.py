@@ -8,7 +8,7 @@ import torch
 from allennlp.nn import util
 from allennlp.data import TextFieldTensors, Vocabulary
 from allennlp.models import Model
-from allennlp.training.metrics import Average
+from allennlp.training.metrics import Average, FBetaMeasure
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,9 @@ class BasicSeq2Seq(Model):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self._compute_test_metrics = compute_test_metrics
         self._accuracy = Average()
+        # used for LexGLUE tasks
+        self._micro = FBetaMeasure(average="micro")
+        self._macro = FBetaMeasure(average="macro")
         # We use this to compute precision and recall. If not set, precision and recall will be 0.
         self._relevant_label_index = relevant_label_index
         self._precision = Average()
@@ -78,27 +81,35 @@ class BasicSeq2Seq(Model):
         if not self.training and self._compute_test_metrics:
             batch_size, num_options, _ = answer_option_ids.shape
             for i in range(batch_size):
+                # setup - we pass through all options as a batch for minor speedup
                 instance_input_ids = input_ids[i:i+1]
+                instance_input_ids = instance_input_ids.repeat(num_options, 1)
                 instance_attention_mask = attention_mask[i:i+1]
-                instance_metadata = metadata[i]
+                instance_attention_mask = instance_attention_mask.repeat(num_options, 1)
                 correct_option_id = correct_answer_index[i].detach().cpu()[0]
+                option_ids = answer_option_ids[i:i+1].squeeze(0)
+                # pass through
+                option_output = self.transformer(
+                    input_ids=instance_input_ids,
+                    attention_mask=instance_attention_mask,
+                    labels=option_ids,
+                    use_cache=False,
+                    return_dict=True,
+                )
+                logits = option_output["logits"].detach()
+                losses = self.loss_fct(logits.permute([0, 2, 1]), option_ids)
+                losses = losses.sum(dim=-1) / (losses != 0).sum(dim=-1)
                 min_loss = None
-                best_option_id = None
-                for j in range(num_options):
-                    # (1, answer_length)
-                    option_ids = answer_option_ids[i:i+1, j:j+1].squeeze(1)
-                    option_output = self.transformer(
-                        input_ids=instance_input_ids,
-                        attention_mask=instance_attention_mask,
-                        labels=option_ids,
-                        use_cache=False,
-                        return_dict=True
-                    )
-                    option_loss = option_output['loss'].detach().cpu()
+                best_option_id = 0
+                for j, option_loss in enumerate(losses):
                     if min_loss is None or min_loss > option_loss:
                         min_loss = option_loss
                         best_option_id = j
                 self._accuracy(correct_option_id == best_option_id)
+                # None since we need a batch_size dim.
+                option_losses = -losses[None, ].detach().cpu()
+                self._micro(option_losses, torch.tensor([correct_option_id])[None, ])
+                self._macro(option_losses, torch.tensor([correct_option_id])[None, ])
                 if best_option_id == self._relevant_label_index:
                     self._precision(correct_option_id == best_option_id)
 
@@ -111,8 +122,17 @@ class BasicSeq2Seq(Model):
 
     @overrides
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:
-        return {
+        metrics_dict = {
             "accuracy": self._accuracy.get_metric(reset),
             "precision": self._precision.get_metric(reset),
             "recall": self._recall.get_metric(reset),
         }
+        # Without this check, when called before any evaluation, causes error
+        if self._macro._true_positive_sum is not None:
+            metrics_dict.update(
+                {
+                    "macro_f1": self._macro.get_metric(reset)["fscore"],
+                    "micro_f1": self._micro.get_metric(reset)["fscore"],
+                }
+            )
+        return metrics_dict
