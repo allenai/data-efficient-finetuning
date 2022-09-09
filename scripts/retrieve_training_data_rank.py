@@ -30,7 +30,7 @@ args = parser.parse_args()
 
 # 
 neighbours_to_write = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
-query_sizes = [100]
+query_size = 32
 args.num_neighbors_search = 5000
 
 #reader = DROPReader(model_name=args.model, split_name='train')
@@ -71,6 +71,8 @@ outputfile = open(args.search_output, "w")
 batch = []
 with torch.inference_mode():
     for instance_idx, instance in enumerate(tqdm.tqdm(reader.read('dummy.txt'))):
+        if instance_idx >= query_size:
+            break
         batch.append({"query": instance["pretokenized_input"]})
         if len(batch) == args.batch_size:
             batch_distances, batch_indices = query_index([i["query"] for i in batch])
