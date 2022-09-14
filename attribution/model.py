@@ -4,6 +4,7 @@ import logging
 
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import torch
+from torch.nn import CrossEntropyLoss
 
 from allennlp.nn import util
 from allennlp.data import TextFieldTensors, Vocabulary
@@ -44,6 +45,7 @@ class BasicSeq2Seq(Model):
         self._precision = Average()
         self._recall = Average()
         self._fake_training = fake_training
+        self.loss_fct = CrossEntropyLoss(ignore_index=-100, reduction="none")  # match hf t5
         if self._fake_training:
             logger.info("Faking training. This will only dump the pretrained transformer into a model archive.")
 
@@ -108,8 +110,8 @@ class BasicSeq2Seq(Model):
                 self._accuracy(correct_option_id == best_option_id)
                 # None since we need a batch_size dim.
                 option_losses = -losses[None, ].detach().cpu()
-                self._micro(option_losses, torch.tensor([correct_option_id])[None, ])
-                self._macro(option_losses, torch.tensor([correct_option_id])[None, ])
+                self._micro(option_losses, torch.tensor([correct_option_id]))
+                self._macro(option_losses, torch.tensor([correct_option_id]))
                 if best_option_id == self._relevant_label_index:
                     self._precision(correct_option_id == best_option_id)
 

@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers import PreTrainedModel
+from allennlp.models import Model
 
 from attribution.model import BasicSeq2Seq
 
