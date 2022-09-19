@@ -19,8 +19,7 @@ class BasicSeq2Seq(Model):
         self,
         vocab: Vocabulary,
         model_name: str = 'google/t5-xl-lm-adapt',
-        compute_test_metrics: bool = True,
-        relevant_label_index: int=None,
+        relevant_label_index: int=0,
         gradient_checkpointing: bool=False,
         fake_training: bool = False,
         checkpoint_for_initialization: str = None,
@@ -34,7 +33,6 @@ class BasicSeq2Seq(Model):
         if gradient_checkpointing:
             self.transformer.gradient_checkpointing_enable()
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self._compute_test_metrics = compute_test_metrics
         self._accuracy = Average()
         # We use this to compute precision and recall. If not set, precision and recall will be 0.
         self._relevant_label_index = relevant_label_index
@@ -75,7 +73,7 @@ class BasicSeq2Seq(Model):
             loss = loss * 0.0
 
         output_dict = {'loss': loss, 'response': []}
-        if not self.training and self._compute_test_metrics:
+        if not self.training:
             batch_size, num_options, _ = answer_option_ids.shape
             for i in range(batch_size):
                 instance_input_ids = input_ids[i:i+1]
