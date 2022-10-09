@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+allennlp
+pyserini_index
+retrieve
+queries
+trained_model/
