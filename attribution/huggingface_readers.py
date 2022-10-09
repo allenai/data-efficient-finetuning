@@ -3,6 +3,7 @@ import logging
 import random
 from collections import defaultdict
 from typing import List, Iterable, Optional, Tuple, Dict
+import torch
 
 from overrides import overrides
 import datasets
@@ -30,7 +31,10 @@ class HuggingfaceReaderRankClassification(DatasetReader):
         max_query_length: int = 512,
         split_name: str = "train",
         val_size: int = 1000,
+        use_val_split: bool = True,
         split_mapping: Dict[str, str] = {"train": "train", "validation": "validation"},
+        return_original_instance: bool = False,
+        seed: int = 42,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -43,6 +47,7 @@ class HuggingfaceReaderRankClassification(DatasetReader):
         self._dataset_name = dataset_name
         self._subset_name = subset_name
         self.split_name = split_name
+        self.return_original_instance = return_original_instance
         original_val_set = datasets.load_dataset(
             dataset_name,
             subset_name,
@@ -51,43 +56,47 @@ class HuggingfaceReaderRankClassification(DatasetReader):
         )
         small_val_size = val_size  # I consider under 1000 examples as small
         val_split_size = val_size  # when splitting out val, get 1000 examples
-        seed = 42
+        if use_val_split:
+            if split_name == "train":
+                if len(original_val_set) >= small_val_size:
+                    self._dataset = datasets.load_dataset(
+                        dataset_name, subset_name, split=split_mapping["train"], data_dir=data_dir
+                    )
+                else:
+                    # for small val sets, split out val from train and use old val as test
+                    # this is because some casehold splits are specially designed, so I want
+                    # to keep these as-is (rather than just split the val set in half)
+                    self._dataset = datasets.load_dataset(
+                        dataset_name, subset_name, split=split_mapping["train"], data_dir=data_dir
+                    ).train_test_split(test_size=val_split_size, seed=seed)["train"]
+            if split_name == "validation":
+                # for large val sets, just split out from val
+                if len(original_val_set) >= small_val_size:
+                    self._dataset = original_val_set.train_test_split(
+                        train_size=val_split_size, seed=seed
+                    )["train"]
+                else:
+                    # for small val sets, split out val from train and use old val as test
+                    self._dataset = datasets.load_dataset(
+                        dataset_name, subset_name, split=split_mapping["train"], data_dir=data_dir
+                    ).train_test_split(test_size=val_split_size, seed=seed)["test"]
+            elif split_name == "test":
+                # for large val sets, test is the small split from val
+                if len(original_val_set) >= small_val_size:
+                    self._dataset = original_val_set.train_test_split(
+                        train_size=val_split_size, seed=seed
+                    )["test"]
+                else:
+                    # for small val sets, split our new val from train (val becomes test)
+                    self._dataset = datasets.load_dataset(
+                        dataset_name, subset_name, split=split_mapping["validation"], data_dir=data_dir
+                    )
+        else:
+            self._dataset = datasets.load_dataset(
+                dataset_name, subset_name, split=split_mapping[split_name], data_dir=data_dir
+            )
         if split_name == "train":
-            if len(original_val_set) >= small_val_size:
-                self._dataset = datasets.load_dataset(
-                    dataset_name, subset_name, split=split_mapping["train"], data_dir=data_dir
-                )
-            else:
-                # for small val sets, split out val from train and use old val as test
-                # this is because some casehold splits are specially designed, so I want
-                # to keep these as-is (rather than just split the val set in half)
-                self._dataset = datasets.load_dataset(
-                    dataset_name, subset_name, split=split_mapping["train"], data_dir=data_dir
-                ).train_test_split(test_size=val_split_size, seed=seed)["train"]
-        if split_name == "validation":
-            # for large val sets, just split out from val
-            if len(original_val_set) >= small_val_size:
-                self._dataset = original_val_set.train_test_split(
-                    train_size=val_split_size, seed=seed
-                )["train"]
-            else:
-                # for small val sets, split out val from train and use old val as test
-                self._dataset = datasets.load_dataset(
-                    dataset_name, subset_name, split=split_mapping["train"], data_dir=data_dir
-                ).train_test_split(test_size=val_split_size, seed=seed)["test"]
-        elif split_name == "test":
-            # for large val sets, test is the small split from val
-            if len(original_val_set) >= small_val_size:
-                self._dataset = original_val_set.train_test_split(
-                    train_size=val_split_size, seed=seed
-                )["test"]
-            else:
-                # for small val sets, split our new val from train (val becomes test)
-                self._dataset = datasets.load_dataset(
-                    dataset_name, subset_name, split=split_mapping["validation"], data_dir=data_dir
-                )
-        if split_name == "train":
-            self._dataset = self._dataset.shuffle(42)
+            self._dataset = self._dataset.shuffle(seed)
         self._transformer_model_name = model_name
         self._tokenizer = PretrainedTransformerTokenizer(model_name)
 
@@ -124,19 +133,22 @@ class HuggingfaceReaderRankClassification(DatasetReader):
 
         input_field = TextField(tokenized_input)
         fields["prompt_and_input"] = input_field
-        fields["prompt_and_input_pretokenized"] = input_text
+        if self.return_original_instance:
+            fields["pretokenized_input"] = input_text
 
         answer_option_fields = [
             TextField(self._tokenizer.tokenize(option)) for option in answer_options
         ]
         options_list_field = ListField(answer_option_fields)
         fields["answer_options"] = options_list_field
-        fields["answer_options_pretokenized"] = answer_options
+        if self.return_original_instance:
+            fields["answer_options_pretokenized"] = answer_options
 
         fields["correct_answer_index"] = IndexField(
             correct_answer_idx, options_list_field
         )
-        fields["correct_answer_index_value"] = correct_answer_idx
+        if self.return_original_instance:
+            fields["correct_answer_index_value"] = correct_answer_idx
 
         return Instance(fields)
 
@@ -321,9 +333,16 @@ class HellaSwagReader(HuggingfaceReaderRankClassification):
 
 # StoryCloze
 ## NB: requires downloading separately as it requires agreeing to a thing
-# 
+# following ia3, we use the val as train and test as val.
 @DatasetReader.register("story_cloze_reader")
 class StoryClozeReader(HuggingfaceReaderRankClassification):
+    def __init__(
+        self,
+        split_mapping={"train": "validation", "validation": "test"},
+        **kwargs,
+    ) -> None:
+        super().__init__(split_mapping=split_mapping, **kwargs)
+        
     def get_dataset_name(self) -> Tuple[str, Optional[str]]:
         return "story_cloze", "2016"
 
@@ -334,7 +353,8 @@ class StoryClozeReader(HuggingfaceReaderRankClassification):
     def hf_to_instance(self, instance) -> Tuple[str, str]:
         input = f"{instance['input_sentence_1']} {instance['input_sentence_2']} {instance['input_sentence_3']} {instance['input_sentence_4']} What is a possible continuation for the story given the following options ?\n- {instance['sentence_quiz1']}\n- {instance['sentence_quiz2']}"
         answers = [instance['sentence_quiz1'], instance['sentence_quiz2']]
-        correct_answer = instance['answer_right_ending']
+        # answers given are 1-indexed
+        correct_answer = instance['answer_right_ending'] - 1
         return [[input, answers, correct_answer]]
 
 # WinoGrande
@@ -451,11 +471,13 @@ if __name__ == '__main__':
     data_classes = [StoryClozeReader, RTEReader, CBReader, HellaSwagReader, COPAReader, WinoGrandeReader, WSCReader, WiCReader, ANLIR1Reader, ANLIR2Reader, ANLIR3Reader]
     data_names = ['story_cloze', 'rte', 'cb', 'hellaswag', 'copa', 'winogrande', 'wsc', 'wic', 'anli_r1', 'anli_r2', 'anli_r3']
     for cls, name in zip(data_classes, data_names):
+        print(name)
         reader = cls(
             model_name="google/t5-large-lm-adapt",
             max_query_length=512,
-            split_name="test",
-            val_size=1e100,  # avoid splitting train set rn.
+            split_name='train',
+            val_size=1e100,
+            use_val_split=False
         )
         lines = []
         for sample in reader.read('dummy'):
@@ -464,6 +486,6 @@ if __name__ == '__main__':
                 "answer_options": sample['answer_options_pretokenized'],
                 'correct_answer_index': sample['correct_answer_index_value']
             }))
-        with open(f'data/{name}_val_data.jsonl', 'w') as f:
+        with open(f'retrieve_data/{name}_val_data.jsonl', 'w') as f:
             f.write('\n'.join(lines))
     

@@ -33,6 +33,7 @@ class QasperEvidencePromptReader(DatasetReader):
         max_query_length: int = 512,
         answer_options: List[str] = ["Yes", "No"],
         negative_sample_ratio: float = 1.0,
+        return_original_query: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -40,6 +41,7 @@ class QasperEvidencePromptReader(DatasetReader):
             manual_multiprocess_sharding=True,
             **kwargs,
         )
+        self._return_original_query = return_original_query
         self._transformer_model_name = model_name
         self._tokenizer = PretrainedTransformerTokenizer(model_name)
 
@@ -170,6 +172,8 @@ class QasperEvidencePromptReader(DatasetReader):
 
         input_field = TextField(tokenized_input)
         fields["prompt_and_input"] = input_field
+        if self._return_original_query:
+            fields['pretokenized_input'] = input_text
 
         answer_option_fields = [
                 TextField(self._tokenizer.tokenize(option)) for option in options

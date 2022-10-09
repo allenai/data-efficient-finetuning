@@ -29,6 +29,7 @@ class DROPReader(DatasetReader):
         max_query_length: int = 512,
         split_name: str = "train",
         val_size: int = 1000,
+        return_original_instance: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -39,6 +40,7 @@ class DROPReader(DatasetReader):
         dataset_name, subset_name = self.get_dataset_name()
         self._dataset_name = dataset_name
         self._subset_name = subset_name
+        self.return_original_instance = return_original_instance
         original_val_set = datasets.load_dataset(
             dataset_name, subset_name, split="validation"
         )
@@ -119,7 +121,8 @@ class DROPReader(DatasetReader):
 
         input_field = TextField(tokenized_input)
         fields["prompt_and_input"] = input_field
-        # fields["pretokenized_input"] = input_text
+        if self.return_original_instance:
+            fields["pretokenized_input"] = input_text
 
         tokenized_target = self._tokenizer.tokenize(target)
         if len(tokenized_target) > self._max_query_length:

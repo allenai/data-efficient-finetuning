@@ -80,7 +80,7 @@ class BasicSeq2Seq(Model):
             loss = loss * 0.0
 
         output_dict = {'loss': loss, 'response': []}
-        if not self.training and self._compute_test_metrics:
+        if not self.training:
             batch_size, num_options, _ = answer_option_ids.shape
             for i in range(batch_size):
                 # setup - we pass through all options as a batch for minor speedup
@@ -100,7 +100,7 @@ class BasicSeq2Seq(Model):
                 )
                 logits = option_output["logits"].detach()
                 losses = self.loss_fct(logits.permute([0, 2, 1]), option_ids)
-                losses = losses.sum(dim=-1) / (losses != 0).sum(dim=-1)
+                losses = losses.sum(dim=-1) #/ (losses != 0).sum(dim=-1)
                 min_loss = None
                 best_option_id = 0
                 for j, option_loss in enumerate(losses):
