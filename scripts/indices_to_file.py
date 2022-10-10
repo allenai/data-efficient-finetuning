@@ -1,6 +1,7 @@
 import tqdm
 import sys
 import json
+import argparse
 
 datasets = [
     "rte",
@@ -19,14 +20,25 @@ datasets = [
     "qasper"
 ]
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--infile_path", type=str, required=True, help="directory containing index files")
+parser.add_argument("--outfile_path", type=str, required=True, help="directory to output files")
+parser.add_argument("--suffix", type=str, required=True, help="what to name the files with form \{dataset\}_\{suffix\}")
+parser.add_argument("--p3_data", type=str, required=True, help="file containing the p3 data the index files reference")
+args = parser.parse_args()
 
-#infiles = [f'/net/nfs.cirrascale/allennlp/hamishi/test/multi-task-attribution/retrieve/1000q_2500n_fixed_pool_t5_base/{outfile}_1000q_2500n_t5_base_indices.txt' for outfile in datasets]
-infiles = [f'/net/nfs.cirrascale/allennlp/hamishi/test/multi-task-attribution/queries/{ds}_idxes.txt' for ds in datasets]
+
+infile_path = args.infile_path
+outfile_path = args.outfile_path
+suffix = args.suffix
+p3_data = args.p3_data
+
+infiles = [f'{infile_path}/{ds}_idxes.txt' for ds in datasets]
 diff_indices = [set([int(i) for i in open(file, 'r')]) for file in infiles]
 print('indices read')
-outfiles = [f'/net/nfs.cirrascale/allennlp/hamishi/test/multi-task-attribution/queries/{ds}_bm25.jsonl' for ds in datasets]
+outfiles = [f'{outfile_path}/{ds}_{suffix}.jsonl' for ds in datasets]
 files = [open(o, "w") for o in outfiles]
-for i, line in tqdm.tqdm(enumerate(open('/net/nfs.cirrascale/allennlp/hamishi/index-data/t0_only/p3_t5_base_filtered_instances.jsonl', 'r'))):
+for i, line in tqdm.tqdm(enumerate(open(p3_data, 'r'))):
     for j, indices in enumerate(diff_indices):
         if str(i) in indices:
             instance = json.loads(line)

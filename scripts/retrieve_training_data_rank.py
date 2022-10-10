@@ -34,11 +34,12 @@ parser.add_argument("--index", type=str, required=True)
 parser.add_argument("--model", type=str, required=True)
 parser.add_argument("--search_output", type=str, required=True)
 parser.add_argument("--batch_size", type=int, default=4)
-parser.add_argument("--num_neighbors_search", type=int, default=100)
+parser.add_argument("--num_neighbors_search", type=int, default=500)
+parser.add_argument("--query_size", type=int, default=1000)
 parser.add_argument("--p3_data", type=str, help="If provided, will write training data to `training_data`")
 parser.add_argument("--training_data", type=str)
-parser.add_argument("--num_neighbors_write", type=int, default=20)
 parser.add_argument("--p3_dataset_indices", type=str, help="If provided, will compute P3 dataset stats")
+parser.add_argument("--outfile_location", type=str, required=True, help="Where to output all the retrieved data points")
 
 args = parser.parse_args()
 
@@ -105,8 +106,9 @@ readers = [
     DropMReader(model_name=args.model, split_name='validation')
 ]
 # load index once into ram.
+print('loading index...')
 index = faiss.read_index(args.index)
-
+print('index loaded!')
 tokenizer = AutoTokenizer.from_pretrained(args.model)
 model = AutoModelForSeq2SeqLM.from_pretrained(args.model)
 if torch.cuda.is_available():
@@ -118,9 +120,9 @@ max_index = 0
 #for data_file, out_file, reader in zip(data_files,training_data):
 for dataset, reader in zip(datasets, readers):
     print(f"Retreiving over {dataset}")
-    neighbours_to_write = [500]
-    query_size = 1000
-    args.num_neighbors_search = 500
+    neighbours_to_write = [args.num_neighbors_search]
+    query_size = args.query_size
+    args.num_neighbors_search = args.num_neighbors_search
 
     #reader = StoryClozeReader(model_name=args.model, split_name='validation')
     #reader = CaseHOLDReader(model_name=args.model, split_name='validation')
@@ -186,7 +188,7 @@ print("Done searching for all datasets. Now writing data...")
 # pickle.dump(indices, open('tmp_indices.pkl', 'w'))
 # indices = pickle.load(open('tmp_indices.pkl', 'rb'))
 
-outfiles = [f'/net/nfs.cirrascale/allennlp/hamishi/test/multi-task-attribution/retrieve/1000q_2500n_fixed_pool_t5_base/{outfile}_1000q_2500n_t5_base_indices.txt' for outfile in datasets]
+outfiles = [f'{args.outfile_location}/{outfile}_{args.query_size}q_{args.num_neighbors_search}n.jsonl' for outfile in datasets]
 files = [open(o, "w") for o in outfiles]
 for i, line in tqdm.tqdm(enumerate(open(args.p3_data))):
     if i > max_index:
