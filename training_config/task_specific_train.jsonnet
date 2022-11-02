@@ -9,16 +9,10 @@ local num_gpus = 1;
 {
     "dataset_reader": {
         "type": std.extVar('TRAIN_DATASET_READER_NAME'),
-	    "split_name": "train",
+	      "split_name": "train",
         "model_name": transformer_model,
     },
     "train_data_path": "dummy",
-    "validation_data_path": "dummy",
-    "validation_dataset_reader": {
-        "type": std.extVar('VALIDATION_DATASET_READER_NAME'),
-	    "split_name": "test",
-        "model_name": transformer_model,
-    },
     "vocabulary": {
         "type": "empty",
     },
