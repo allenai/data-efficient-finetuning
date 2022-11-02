@@ -34,6 +34,7 @@ class QasperEvidencePromptReader(DatasetReader):
         answer_options: List[str] = ["Yes", "No"],
         negative_sample_ratio: float = 1.0,
         return_original_query: bool = False,
+        max_train_samples: int = -1,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -52,17 +53,23 @@ class QasperEvidencePromptReader(DatasetReader):
         self._answer_options = answer_options
         self._negative_sample_ratio = negative_sample_ratio
         self._stats = defaultdict(int)
+        self._max_train_samples = max_train_samples
 
     @overrides
     def _read(self, file_path: str) -> Iterable[Instance]:
         logger.info("Reading the dataset")
+        counter = 0
         with open(file_path, "r") as datafile:
             data = json.load(datafile)
             for article_id, article in self.shard_iterable(data.items()):
                 if not article["full_text"]:
                     continue
                 article["article_id"] = article_id
-                yield from self._article_to_instances(article)
+                for sample in self._article_to_instances(article):
+                    if self._max_train_samples > 0 and counter >= self._max_train_samples:
+                        break
+                    counter += 1
+                    yield sample
 
         logger.info("Dataset stats:")
         for key, value in self._stats.items():

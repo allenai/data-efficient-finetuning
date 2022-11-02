@@ -40,7 +40,7 @@ outfiles = [f'{outfile_path}/{ds}_{suffix}.jsonl' for ds in datasets]
 files = [open(o, "w") for o in outfiles]
 for i, line in tqdm.tqdm(enumerate(open(p3_data, 'r'))):
     for j, indices in enumerate(diff_indices):
-        if str(i) in indices:
+        if i in indices:
             instance = json.loads(line)
             instance["index_id"] = i
             print(json.dumps(instance), file=files[j])

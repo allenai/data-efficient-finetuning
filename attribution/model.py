@@ -25,6 +25,7 @@ class BasicSeq2Seq(Model):
         gradient_checkpointing: bool=False,
         fake_training: bool = False,
         checkpoint_for_initialization: str = None,
+        weights_file : str = None,
         **kwargs
     ):
         super().__init__(vocab, **kwargs)
@@ -48,6 +49,10 @@ class BasicSeq2Seq(Model):
         self.loss_fct = CrossEntropyLoss(ignore_index=-100, reduction="none")  # match hf t5
         if self._fake_training:
             logger.info("Faking training. This will only dump the pretrained transformer into a model archive.")
+        if weights_file is not None:
+            with open(weights_file, 'rb') as f:
+                self.load_state_dict(torch.load(f))
+
 
     def forward(
         self,

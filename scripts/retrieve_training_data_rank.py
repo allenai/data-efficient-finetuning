@@ -91,19 +91,19 @@ for dataset in datasets:
 # readers for each dataset.
 # we use train splits for t0 tasks, custom splits for other.
 readers = [
-    RTEReader(model_name=args.model, split_name='train', use_val_split=False),
-    ANLIR1Reader(model_name=args.model, split_name='train', use_val_split=False),
-    ANLIR2Reader(model_name=args.model, split_name='train', use_val_split=False),
-    ANLIR3Reader(model_name=args.model, split_name='train', use_val_split=False),
-    WiCReader(model_name=args.model, split_name='train', use_val_split=False),
-    COPAReader(model_name=args.model, split_name='train', use_val_split=False),
-    WSCReader(model_name=args.model, split_name='train', use_val_split=False),
-    WinoGrandeReader(model_name=args.model, split_name='train', use_val_split=False),
-    HellaSwagReader(model_name=args.model, split_name='train', use_val_split=False),
-    CBReader(model_name=args.model, split_name='train', use_val_split=False),
-    StoryClozeReader(model_name=args.model, split_name='train', use_val_split=False),
-    CaseHOLDReader(model_name=args.model, split_name='validation'),
-    DropMReader(model_name=args.model, split_name='validation')
+    RTEReader(model_name=args.model, split_name='train', use_val_split=False, return_original_instance=True),
+    ANLIR1Reader(model_name=args.model, split_name='train', use_val_split=False, return_original_instance=True),
+    ANLIR2Reader(model_name=args.model, split_name='train', use_val_split=False, return_original_instance=True),
+    ANLIR3Reader(model_name=args.model, split_name='train', use_val_split=False, return_original_instance=True),
+    WiCReader(model_name=args.model, split_name='train', use_val_split=False, return_original_instance=True),
+    COPAReader(model_name=args.model, split_name='train', use_val_split=False, return_original_instance=True),
+    WSCReader(model_name=args.model, split_name='train', use_val_split=False, return_original_instance=True),
+    WinoGrandeReader(model_name=args.model, split_name='train', use_val_split=False, return_original_instance=True),
+    HellaSwagReader(model_name=args.model, split_name='train', use_val_split=False, return_original_instance=True),
+    CBReader(model_name=args.model, split_name='train', use_val_split=False, return_original_instance=True),
+    StoryClozeReader(model_name=args.model, split_name='train', use_val_split=False, return_original_instance=True),
+    CaseHOLDReader(model_name=args.model, split_name='validation', return_original_instance=True),
+    DropMReader(model_name=args.model, split_name='validation', return_original_instance=True)
 ]
 # load index once into ram.
 print('loading index...')
@@ -195,10 +195,10 @@ for i, line in tqdm.tqdm(enumerate(open(args.p3_data))):
         break
     for j, dataset in enumerate(datasets):
         indices_frequencies = per_ds_per_neighbour_indices_frequencies[dataset][neighbours_to_write[0]]
-        if str(i) in indices_frequencies:
+        if i in indices_frequencies:
             instance = json.loads(line)
             instance["index_id"] = i
-            instance["attribution_frequency"] = indices_frequencies[str(i)]
+            instance["attribution_frequency"] = indices_frequencies[i]
             print(json.dumps(instance), file=files[j])
 
 # for i, line in tqdm.tqdm(enumerate(open(args.p3_data))):

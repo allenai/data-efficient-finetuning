@@ -6,3 +6,4 @@ scikit-learn==1.0.2
 allennlp==2.9.3
 overrides==6.1.0
 faiss-gpu==1.7.2
+cached-path==1.1.2

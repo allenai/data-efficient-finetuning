@@ -21,15 +21,16 @@ parser.add_argument("--index", type=str)
 parser.add_argument("--model", type=str)
 parser.add_argument("--search_output", type=str, required=True)
 parser.add_argument("--batch_size", type=int, default=4)
-parser.add_argument("--num_neighbors_search", type=int, default=2500)
+parser.add_argument("--num_neighbors_search", type=int, default=500)
 parser.add_argument("--p3_data", type=str, help="If provided, will write training data to `training_data`")
 parser.add_argument("--training_data", type=str)
-parser.add_argument("--num_neighbors_write", type=int, default=2500)
+parser.add_argument("--num_neighbors_write", type=int, default=500)
 parser.add_argument("--write_positive_neighbors_only", action="store_true", help="If set, will write neighbors of positive dev instances alone")
 parser.add_argument("--coreset_size", type=int, default=None, help="If set, will use KMeans++ to select these many diverse points")
 parser.add_argument("--p3_dataset_indices", type=str, help="If provided, will compute P3 dataset stats")
 parser.add_argument("--stats_log", type=str, help="File to write the dataset stats")
 parser.add_argument("--cuda_devices", type=int, nargs="+")
+parser.add_argument("--retrieval_set_size", type=int, default=1000)
 args = parser.parse_args()
 
 
@@ -48,7 +49,9 @@ if not os.path.exists(args.search_output):
         model.cuda(device=cuda_devices[0])
     model.eval()
     encoder = torch.nn.DataParallel(model.encoder, device_ids=cuda_devices)
+    print('loading index... (make take some time)')
     index = faiss.read_index(args.index)
+    print('loaded index!')
 
     def query_index(queries):
         input_data = tokenizer.batch_encode_plus(queries,
@@ -73,7 +76,7 @@ if not os.path.exists(args.search_output):
     instances = [i for i in reader.read(args.dev_data)]
     # import random
     # random.shuffle(instances)
-    # instances = instances[:1000]
+    # instances = instances[:args.retrieval_set_size]
     outputfile = open(args.search_output, "w")
     batch = []
     with torch.inference_mode():

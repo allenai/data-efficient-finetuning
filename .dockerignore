@@ -1,0 +1,5 @@
+trained_model/
+queries/
+retrieve/
+__pycache__/
+venv/

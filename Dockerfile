@@ -4,7 +4,7 @@ ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
 
 # for jsonnet
-RUN apt-get update
+RUN apt-get -y update
 RUN apt-get install build-essential -y
 
 WORKDIR /
@@ -16,3 +16,5 @@ RUN pip install -r requirements.txt
 COPY attribution attribution
 COPY scripts scripts
 COPY training_config training_config
+COPY shell_scripts shell_scripts
+COPY qasper_train_and_eval.sh qasper_train_and_eval.sh

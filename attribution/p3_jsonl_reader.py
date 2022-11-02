@@ -2,7 +2,7 @@ import json
 import pickle
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List, Iterable
+from typing import Any, Dict, List, Iterable, Text
 
 from overrides import overrides
 
@@ -29,6 +29,7 @@ class P3ClusterReader(DatasetReader):
         self,
         model_name: str = "google/t5-xl-lm-adapt",
         max_query_length: int = 512,
+        max_answer_length: int = 256,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -43,6 +44,7 @@ class P3ClusterReader(DatasetReader):
             "tokens": PretrainedTransformerIndexer(model_name)
         }
         self._max_query_length = max_query_length
+        self._max_answer_length = max_answer_length
         self._stats = None
 
     @overrides
@@ -93,9 +95,13 @@ class P3ClusterReader(DatasetReader):
         input_field = TextField(tokenized_input)
         fields["prompt_and_input"] = input_field
 
-        answer_option_fields = [
-                TextField(self._tokenizer.tokenize(option)) for option in options
-        ]
+        answer_option_fields = []
+        for option in options:
+            tokenized_option = self._tokenizer.tokenize(option)
+            if len(tokenized_option) > self._max_answer_length:
+                self._stats["Truncated options"] += 1
+                tokenized_option = tokenized_option[:self._max_answer_length]
+            answer_option_fields.append(TextField(tokenized_option))
         options_list_field = ListField(answer_option_fields)
         fields["answer_options"] = options_list_field
 
