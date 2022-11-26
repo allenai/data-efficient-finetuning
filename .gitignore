@@ -133,3 +133,12 @@ pyserini_index
 retrieve
 queries
 trained_model/
+ni_retrieval
+pyserini_chunks
+bm25_res/
+indices
+allennlp-2.10.1-py3*
+beaker*.yaml
+qasper_sweep/
+loop_over*
+task_retrieved_only*

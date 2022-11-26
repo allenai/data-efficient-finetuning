@@ -34,7 +34,7 @@ parser.add_argument("--index", type=str, required=True)
 parser.add_argument("--model", type=str, required=True)
 parser.add_argument("--search_output", type=str, required=True)
 parser.add_argument("--batch_size", type=int, default=4)
-parser.add_argument("--num_neighbors_search", type=int, default=500)
+parser.add_argument("--num_neighbors_search", type=int, default=3000)
 parser.add_argument("--query_size", type=int, default=1000)
 parser.add_argument("--p3_data", type=str, help="If provided, will write training data to `training_data`")
 parser.add_argument("--training_data", type=str)
@@ -154,7 +154,7 @@ for dataset, reader in zip(datasets, readers):
 
     g = lambda: defaultdict(int)
     per_ds_per_neighbour_indices_frequencies[dataset] = defaultdict(g)
-    outputfile = open(args.search_output, "w")
+    outputfile = open(f"{args.search_output}_{dataset}_idxes.jsonl", "w")
     batch = []
     with torch.inference_mode():
         for instance_idx, instance in enumerate(tqdm.tqdm(reader.read(filename))):

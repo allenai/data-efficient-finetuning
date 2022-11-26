@@ -143,3 +143,17 @@ class BasicSeq2Seq(Model):
                 }
             )
         return metrics_dict
+
+# a regular model, but we load the underlying model from a .th file.
+# useful for training on top of other trained models.
+@Model.register("load_seq2seq")
+class LoadBasicSeq2Seq(BasicSeq2Seq):
+    def __init__(
+        self,
+        load_from_file:str = None,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        if load_from_file is not None:
+            with open(load_from_file, 'rb') as f:
+                self.load_state_dict(torch.load(f))

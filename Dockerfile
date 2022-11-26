@@ -15,6 +15,7 @@ RUN pip install -r requirements.txt
 # only copy the relevant folders
 COPY attribution attribution
 COPY scripts scripts
+COPY natural_instructions natural_instructions
 COPY training_config training_config
 COPY shell_scripts shell_scripts
-COPY qasper_train_and_eval.sh qasper_train_and_eval.sh
+COPY ni_train_and_eval.sh ni_train_and_eval.sh

@@ -1,5 +1,4 @@
 import argparse
-import random
 import faiss
 import numpy
 from sklearn.cluster import kmeans_plusplus
@@ -12,7 +11,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from attribution.qasper_reader import QasperEvidencePromptReader
+from attribution.p3_jsonl_reader import P3ClusterReader
 
 
 parser = argparse.ArgumentParser()
@@ -22,10 +21,10 @@ parser.add_argument("--index", type=str)
 parser.add_argument("--model", type=str)
 parser.add_argument("--search_output", type=str, required=True)
 parser.add_argument("--batch_size", type=int, default=4)
-parser.add_argument("--num_neighbors_search", type=int, default=500)
+parser.add_argument("--num_neighbors_search", type=int, default=1000)
 parser.add_argument("--p3_data", type=str, help="If provided, will write training data to `training_data`")
 parser.add_argument("--training_data", type=str)
-parser.add_argument("--num_neighbors_write", type=int, default=500)
+parser.add_argument("--num_neighbors_write", type=int, default=1000)
 parser.add_argument("--write_positive_neighbors_only", action="store_true", help="If set, will write neighbors of positive dev instances alone")
 parser.add_argument("--coreset_size", type=int, default=None, help="If set, will use KMeans++ to select these many diverse points")
 parser.add_argument("--p3_dataset_indices", type=str, help="If provided, will compute P3 dataset stats")
@@ -41,7 +40,7 @@ if not os.path.exists(args.search_output):
     assert args.dev_data is not None
     assert args.index is not None
     assert args.model is not None
-    reader = QasperEvidencePromptReader(model_name=args.model, negative_sample_ratio=args.negative_sample_ratio)
+    reader = P3ClusterReader(max_query_length=1024, return_original_input=True)
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     model = AutoModelForSeq2SeqLM.from_pretrained(args.model)
     cuda_devices = [0]
@@ -75,14 +74,14 @@ if not os.path.exists(args.search_output):
         return index.search(pooled_hidden_states_np, k=args.num_neighbors_search)
 
     instances = [i for i in reader.read(args.dev_data)]
-    random.shuffle(instances)
+    import random
+    random.Random(42).shuffle(instances)
     instances = instances[:args.retrieval_set_size]
     outputfile = open(args.search_output, "w")
     batch = []
     with torch.inference_mode():
         for instance in tqdm.tqdm(instances): #tqdm.tqdm(reader.read(args.dev_data)):
-            metadata = instance.fields['metadata'].metadata
-            batch.append({"question_id": metadata["question_id"], "query": metadata["query"], "paragraph_index": metadata["paragraph_index"], "target": metadata["target"]})
+            batch.append({"query": instance["pretokenized_input"]})
             if len(batch) == args.batch_size:
                 batch_distances, batch_indices = query_index([i["query"] for i in batch])
                 for instance_, distances, indices in zip(batch, batch_distances, batch_indices):
@@ -91,7 +90,7 @@ if not os.path.exists(args.search_output):
                         for id_ in ids[:args.num_neighbors_write]:
                             indices_frequencies[id_] += 1
                     distances = [float(distance) for distance in distances]
-                    datum = {"question_id": instance_["question_id"], "paragraph_index": instance_["paragraph_index"], "target": instance_["target"], "ids": ids, "distances": distances}
+                    datum = {"input": instance["pretokenized_input"], "ids": ids, "distances": distances}
                     print(json.dumps(datum), file=outputfile)
                 outputfile.flush()
                 batch = []

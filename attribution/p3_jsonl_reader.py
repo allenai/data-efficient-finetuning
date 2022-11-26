@@ -30,6 +30,7 @@ class P3ClusterReader(DatasetReader):
         model_name: str = "google/t5-xl-lm-adapt",
         max_query_length: int = 512,
         max_answer_length: int = 256,
+        return_original_input: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -37,6 +38,7 @@ class P3ClusterReader(DatasetReader):
             manual_multiprocess_sharding=True,
             **kwargs,
         )
+        self.return_original_input = return_original_input
         self._transformer_model_name = model_name
         self._tokenizer = PretrainedTransformerTokenizer(model_name)
 
@@ -49,6 +51,10 @@ class P3ClusterReader(DatasetReader):
 
     @overrides
     def _read(self, file_path: str) -> Iterable[Instance]:
+        for instance in self.shard_iterable(self.__read(file_path)):
+            yield instance 
+
+    def __read(self, file_path: str) -> Iterable[Instance]:
         self._stats = defaultdict(int)
         logger.info(f"Reading data from {file_path}")
         for line in open(file_path):
@@ -94,6 +100,8 @@ class P3ClusterReader(DatasetReader):
 
         input_field = TextField(tokenized_input)
         fields["prompt_and_input"] = input_field
+        if self.return_original_input:
+            fields['pretokenized_input'] = input_text
 
         answer_option_fields = []
         for option in options:

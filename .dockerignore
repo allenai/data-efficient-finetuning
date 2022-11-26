@@ -3,3 +3,7 @@ queries/
 retrieve/
 __pycache__/
 venv/
+ni_retrieval
+pyserini_chunks
+bm25_res/
+indices
