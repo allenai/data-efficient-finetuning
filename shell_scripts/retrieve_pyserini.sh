@@ -1,5 +1,5 @@
 
-QUERY_LOCATION=queries  # should contain tsvs of name {dataset}.tsv with format "id\tquery_string" (id can be whatever)
+QUERY_LOCATION=queries  # should contain tsvs of name {dataset}.tsv with format "id \t query_string" (id can be whatever)
 P3_DATA=$1  # location of jsonl where each line is a p3 instance and the index doc ids == the index of datapoints in this file.
 
 # searching

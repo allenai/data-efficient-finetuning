@@ -1,7 +1,7 @@
-local transformer_model = std.extVar('MODEL_NAME');
+local transformer_model = 'google/t5-xl-lm-adapt';
 local epochs = 5;
 local batch_size = 1;
-local num_gradient_accumulation_steps = 2;
+local num_gradient_accumulation_steps = 8;
 
 local p3_data_path = "data/p3_data_with_options.json";
 
@@ -12,8 +12,16 @@ local num_gpus = 4;
     "dataset_reader": {
         "type": "p3_jsonl",
         "model_name": transformer_model,
+        "max_answer_length": 256
     },
     "train_data_path": std.extVar('TRAIN_DATA_PATH'),
+    "validation_dataset_reader": {
+      "type": std.extVar('VALIDATION_DATASET_READER_NAME'),
+      "model_name": transformer_model,
+      "use_val_split": false,
+      "split_name": "validation"
+    },
+    "validation_data_path": "dummy",
     "vocabulary": {
         "type": "empty",
     },
@@ -46,8 +54,6 @@ local num_gpus = 4;
       "patience": epochs,
       "enable_default_callbacks": false,
       "use_amp": false,
+      "cuda_device": 0
     },
-    "distributed": {
-      "cuda_devices": [0, 1, 2, 3],
-    }
 }

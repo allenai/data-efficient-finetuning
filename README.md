@@ -34,7 +34,7 @@ TODO: provide our saved indices for easier reproduction.
 
 ## Retrieving
 
-Once you have a finished index, you can retrieve qasper data using:
+Once you have a finished indexing, you can retrieve qasper data using:
 ```
 python scripts/retrieve_training_data.py \
     --p3_data <p3 jsonl location> \
@@ -57,6 +57,35 @@ Note this script will retrieve over all datasets and place files of form `{datas
 
 Both scripts output `jsonl` files where each line is an input instance with form `{"input": <input>, "target": <target>, "index_id": <line number of datapoint in p3 data file>}`.
 
+### BM25 Index
+
+We use pyserini for BM25. Simply run `shell_scripts/create_pyserini_index.sh` with the appropriate arguments (data in a compatible format, output file, number of threads). See the pyserini documentation for more information.
+
+You can then retrieve using `shell_scripts/retrieve_pyserini.sh`. You'll need to generate some queries files (e.g. by dumping out the relevant data from the readers). Please consult the script for more details.
+
+### Super-Natural Instructions
+
+Basically, follow the same instructions as for P3, but use `scrpts/index_ni_train_reps.py` (with a file called `ni_dump_raw.jsonl` containing the NI data to index). To retrieve, use `scripts/retrieve_training_data_ni.py`. This works similar to the Qasper retrieval. Most of the arguments for these two scripts are similar to the P3 case.
+
 ## Training
 
-Once all the above is done, you can train models using `allennlp train` and the configs provided in `training_config/`.
+Once all the above is done, you can train models using `allennlp train` and the configs provided in `training_config`. These configs should largely work out of the box on a single GPU machine, so long as you set the required environment variables (or just replace them in the config directly). For example, to train a model on some retrieved data and evaluate it on RTE, do:
+```bash
+export TRAIN_DATA_PATH=retrieved_data.jsonl
+export VALIDATION_DATASET_READER_NAME=rte_reader
+allennlp train -s training_config/task_retrieved_only.jsonnet <model output folder>  --include-package attribution
+```
+
+Any reader defined in `attribution` can be used (see the readers in `huggingface_readers.py` for an example). Evaluation will run during training after each epoch. To replicate DEFT, take only the value calculated after the 5th epoch (not the best overall).
+
+### CaseHOLD
+
+For casehold, we retrieved using 1000 examples split from validation, and tested on the remaining data. To emulate this, make sure the `validataion_dataset_reader` has `"use_val_split": true`.
+
+### DROP, QasperEvidence, Super-Natural Instructions
+
+DROP, QasperEvidence, and Super-Natural Instructions use evaluation setups that we run after training, rather than during (like the other setups). See `shell_scripts/evaluate_{dataset}.sh` for the evaluation of each. Note that Super-Natural Instructions will perform evaluation over all evaluation tasks, but we usually only care about few to one tasks at any given time (see the paper for more details).
+
+## Issues? Comments?
+
+Please lodge an issue if you have any questions!
