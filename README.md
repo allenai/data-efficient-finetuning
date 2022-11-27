@@ -1,4 +1,4 @@
-# DEFT: Data-Efficient FineTuning using cross-task nearest neighbor
+# DEFT: Data-Efficient FineTuning using cross-task nearest neighbors
 
 Codebase for the paper **Data-Efficient Finetuning using cross-task nearest neighbors**. We show that using a small amount of task-specific unlabelled data to retrieve relevant examples out of a large pool of multi-task data results in models that perform better on the given task than models trained on the entire pool of data. Notably, this allows improved performance while **training on up to 50x less data than general multitask models**. An overview of our approach is below:
 
@@ -7,21 +7,19 @@ Codebase for the paper **Data-Efficient Finetuning using cross-task nearest neig
 
 We evaluate our approach on a number of tasks, including the 11 tasks used to evaluate T0 and 3 additional tasks (DROP, Qasper, CaseHold) covering diverse domains:
 
-| Model      | Average Performance across 14 Tasks |
+| Model      | Average Accuracy across 14 Tasks |
 | ----------- | ----------- |
-| T0-3B      | 46.5       |
-| T5-XL | 35.9 |
-| DEFT-XL (ours)   | **51.3**        |
+| T0-3B      | 46.5%   |
+| T5-XL | 35.9% |
+| DEFT-XL (ours)   | **51.3%**        |
 
 ## Setup
 
 First, install the required dependencies, preferably in a virtualenv: `pip install -r requirements.txt`. We primarily use `allennlp` for training and evaluation. If you wish to replicate the BM25 experiments, you'll also need a working Java 11+ installation (working `java` and `javac` commands), as per the [pyserini documentation](https://github.com/castorini/pyserini).
 
-Most of our experiments work off the P3 data, specifically the subset used to train T0 (not the 'plus' variants). The formatted data can be downloaded via huggingface datasets under [bigscience/P3](https://huggingface.co/datasets/bigscience/P3). The list of datasets along with prompt names used can be found in `data/t0_prompt_tasks.txt`.
+Most of our experiments work off the P3 data, specifically the subset used to train T0 (not the 'plus' variants). To download, use `python scripts/download_p3 --p3_output_file <output file>`. This should dump out the P3 data into a `.jsonl` in a usable format. This may take a day or so to run on a single machine due to the size of P3. Once downloaded, shuffling the file is recommended so that when creating the index you are not loading in datasets one by one (although ultimately this shouldn't make a big difference).
 
-TODO: a way to easily download the P3 data for use in our codebase. Stealing from 'meta-learn-prompt' is probably okay.
-
-Once you have the P3 data in a (ideally shuffled) `.jsonl` file, name it `p3_train_instances_shuffled.jsonl.gz`, then you can construct a FAISS index with a command like:
+Once you have the P3 data in a (ideally shuffled) `.jsonl` file, name it `p3_train_instances_shuffled.jsonl`, then you can construct a FAISS index with a command like:
 ```
 python scripts/index_p3_train_reps.py \
     --model google/t5-xl-lm-adapt \
@@ -31,6 +29,12 @@ python scripts/index_p3_train_reps.py \
 This will output a file like `p3_google-t5-xl-lm-adapt_OPQ8_512-HNSW512-PQ8_efConstruction-200_efSearch-128.index` in the same location as the P3 data. **Note that index construction can take as long as a week due to the large amount of P3 data**, and the process will use a large amount of RAM and may be killed after running a few days. The script will save periodic checkpoints and rerunning the same command will pick up from the last saved checkpoint.
 
 TODO: provide our saved indices for easier reproduction.
+
+### Evaluation Data
+
+For the most part, we use huggingface datasets for evaluation and so it should download automatically. There are two exceptions:
+- For Story Cloze, you need to download the data yourself. See [here](https://huggingface.co/datasets/story_cloze) for details.
+- For QasperEvidence, we use custom dev/test splits. These files are available... TODO
 
 ## Retrieving
 
