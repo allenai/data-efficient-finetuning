@@ -34,7 +34,8 @@ TODO: provide our saved indices for easier reproduction.
 
 For the most part, we use huggingface datasets for evaluation and so it should download automatically. There are two exceptions:
 - For Story Cloze, you need to download the data yourself. See [here](https://huggingface.co/datasets/story_cloze) for details.
-- For QasperEvidence, we use custom dev/test splits. These files are available... TODO
+- For QasperEvidence, we use custom dev/test splits. These files are available in `data/qasper` (`dev-eval` was used for retrieval and `test` for testing).
+
 
 ## Retrieving
 
@@ -82,9 +83,9 @@ allennlp train -s training_config/task_retrieved_only.jsonnet <model output fold
 
 Any reader defined in `attribution` can be used (see the readers in `huggingface_readers.py` for an example). Evaluation will run during training after each epoch. To replicate DEFT, take only the value calculated after the 5th epoch (not the best overall).
 
-### CaseHOLD
+### Split Evaluation Datasets
 
-For casehold, we retrieved using 1000 examples split from validation, and tested on the remaining data. To emulate this, make sure the `validataion_dataset_reader` has `"use_val_split": true`.
+For casehold and DROP, we retrieved using 1000 examples split from validation, and tested on the remaining data. To emulate this, make sure the `validataion_dataset_reader` has `"use_val_split": true`.
 
 ### DROP, QasperEvidence, Super-Natural Instructions
 
