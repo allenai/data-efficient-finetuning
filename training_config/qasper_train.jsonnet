@@ -11,8 +11,7 @@ local num_gpus = 1;
 {
     "dataset_reader": {
         "type": "qasper_evidence_prompt",
-        "model_name": transformer_model,
-        "max_train_samples": std.parseInt(std.extVar('NUM_SAMPLES')),
+        "model_name": transformer_model
     },
     "train_data_path": std.extVar('TRAIN_DATA_PATH'),
     "vocabulary": {
@@ -20,8 +19,7 @@ local num_gpus = 1;
     },
     "model": {
         "type": "seq2seq",
-        "model_name": transformer_model,
-        "weights_file": std.extVar('WEIGHTS_NAME'),
+        "model_name": transformer_model
     },
     "data_loader": {
         "batch_size": batch_size,
