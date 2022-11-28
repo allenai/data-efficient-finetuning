@@ -19,21 +19,21 @@ First, install the required dependencies, preferably in a virtualenv: `pip insta
 
 Most of our experiments work off the P3 data, specifically the subset used to train T0 (not the 'plus' variants). To download, use `python scripts/download_p3 --p3_output_file <output file>`. This should dump out the P3 data into a `.jsonl` in a usable format. This may take a day or so to run on a single machine due to the size of P3. Once downloaded, shuffling the file is recommended so that when creating the index you are not loading in datasets one by one (although ultimately this shouldn't make a big difference).
 
-Once you have the P3 data in a (ideally shuffled) `.jsonl` file, name it `p3_train_instances_shuffled.jsonl`, then you can construct a FAISS index with a command like:
+Once you have the P3 data in a (ideally shuffled) `.jsonl` file, then you can construct a FAISS index with a command like below. Note the code assumes you are encoding large (> 10000 examples) datasets.
 ```
 python scripts/index_p3_train_reps.py \
     --model google/t5-xl-lm-adapt \
-    --output_prefix <folder containing p3 data file>
+    --data_file <.jsonl file containing data to index> \
+    --output_prefix <folder to place index in> \
+    --device_ids 0
 ```
 
-This will output a file like `p3_google-t5-xl-lm-adapt_OPQ8_512-HNSW512-PQ8_efConstruction-200_efSearch-128.index` in the same location as the P3 data. **Note that index construction can take as long as a week due to the large amount of P3 data**, and the process will use a large amount of RAM and may be killed after running a few days. The script will save periodic checkpoints and rerunning the same command will pick up from the last saved checkpoint.
-
-TODO: provide our saved indices for easier reproduction.
+This will output a file with a name like `p3_google-t5-xl-lm-adapt_OPQ8_512-HNSW512-PQ8_efConstruction-200_efSearch-128.index` in the same location as the P3 data. **Note that index construction can take as long as a week due to the large amount of P3 data**, and the process will use a large amount of RAM and may be killed after running a few days. The script will save periodic checkpoints and rerunning the same command will pick up from the last saved checkpoint.
 
 ### Evaluation Data
 
 For the most part, we use huggingface datasets for evaluation and so it should download automatically. There are two exceptions:
-- For Story Cloze, you need to download the data yourself. See [here](https://huggingface.co/datasets/story_cloze) for details.
+- For Story Cloze, you need to download the data yourself. See [here](https://huggingface.co/datasets/story_cloze) for details. Please replace line 351 in `attribution/huggingface_readers.py` with the location of your downloaded story cloze data.
 - For QasperEvidence, we use custom dev/test splits. These files are available in `data/qasper` (`dev-eval` was used for retrieval and `test` for testing).
 
 
@@ -46,7 +46,8 @@ python scripts/retrieve_training_data.py \
     --index <index output file> \
     --model google/t5-xl-lm-adapt \
     --search_output <output filename for indices> \
-    --training_data <output filename for retrieved data>
+    --training_data <output filename for retrieved data> \
+    --dev_data data/qasper/qasper-dev-eval-v0.3.json
 ```
 and retrieve data for all other datasets with:
 ```
@@ -64,7 +65,7 @@ Both scripts output `jsonl` files where each line is an input instance with form
 
 ### BM25 Index
 
-We use pyserini for BM25. Simply run `shell_scripts/create_pyserini_index.sh` with the appropriate arguments (data in a compatible format, output file, number of threads). See the pyserini documentation for more information.
+We use pyserini for BM25. Run `shell_scripts/create_pyserini_index.sh` with the appropriate arguments (data in a compatible format, output file, number of threads). See the pyserini documentation for more information.
 
 You can then retrieve using `shell_scripts/retrieve_pyserini.sh`. You'll need to generate some queries files (e.g. by dumping out the relevant data from the readers). Please consult the script for more details.
 
@@ -81,13 +82,16 @@ export VALIDATION_DATASET_READER_NAME=rte_reader
 allennlp train -s training_config/task_retrieved_only.jsonnet <model output folder>  --include-package attribution
 ```
 
-Any reader defined in `attribution` can be used (see the readers in `huggingface_readers.py` for an example). Evaluation will run during training after each epoch. To replicate DEFT, take only the value calculated after the 5th epoch (not the best overall).
+Any reader defined in `attribution` can be used (see the readers in `huggingface_readers.py` for an example). Evaluation will run during training after each epoch. To replicate DEFT, take only the value calculated after the 5th epoch (not the best overall). For training on drop and qasper, see `training_config/drop_train.jsonnet` and `training_config/qasper_train.jsonnet` respectively. For most datasets this config can be used as-is, but some datasets require small changes:
 
-### Split Evaluation Datasets
+- DROP: set `validation_dataset_reader` to using `"use_val_split": true` to split out the 1000 validation examples used from retrieval. Evaluation is done after training (see below).
+- CaseHold:  set `validation_dataset_reader` to using `"use_val_split": true` to split out the 1000 validation examples used from retrieval. Evaluation can be done during training.
+- Qasper: use the `qasper_evidence_prompt` reader do not evaluate during training. See below for how to evaluate.
+- Super-Natural Instructions: do not evaluate during training, see below.
 
-For casehold and DROP, we retrieved using 1000 examples split from validation, and tested on the remaining data. To emulate this, make sure the `validataion_dataset_reader` has `"use_val_split": true`.
+For IA3 training, see `training_config/ia3_train_load.jsonnet`. This additionally requires a `WEIGHTS_NAME` environment variable to load in a trained model (an allennlp-saved file ending in `.th`).
 
-### DROP, QasperEvidence, Super-Natural Instructions
+### DROP, QasperEvidence, Super-Natural Instructions Evaluation
 
 DROP, QasperEvidence, and Super-Natural Instructions use evaluation setups that we run after training, rather than during (like the other setups). See `shell_scripts/evaluate_{dataset}.sh` for the evaluation of each. Note that Super-Natural Instructions will perform evaluation over all evaluation tasks, but we usually only care about few to one tasks at any given time (see the paper for more details).
 

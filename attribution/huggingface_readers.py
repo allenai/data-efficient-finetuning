@@ -347,8 +347,9 @@ class StoryClozeReader(HuggingfaceReaderRankClassification):
         return "story_cloze", "2016"
 
     # we usually dont need this, but story cloze requires it.
+    # TODO: replace with the location of downloaded story cloze data.
     def get_dataset_dir(self) -> Optional[str]:
-        return '/net/nfs.cirrascale/allennlp/hamishi/downloaded_story_cloze/'
+        return ''
 
     def hf_to_instance(self, instance) -> Tuple[str, str]:
         input = f"{instance['input_sentence_1']} {instance['input_sentence_2']} {instance['input_sentence_3']} {instance['input_sentence_4']} What is a possible continuation for the story given the following options ?\n- {instance['sentence_quiz1']}\n- {instance['sentence_quiz2']}"
