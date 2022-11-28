@@ -1,15 +1,18 @@
 import json
 import gzip
 import argparse
-
+import os
+from datasets import load_from_disk
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--datasets", type=str, help="Json file containing the list of P3 datasets to load")
 parser.add_argument("--output_prefix", type=str, required=True)
+parser.add_argument("--data_cache", type=str, required=True, help="location of the data cache")
+parser.add_argument("--text_instances_file", type=str, required=True, help="output filename for processed data")
 
 args = parser.parse_args()
 
-data_cache = "/net/nfs.cirrascale/allennlp/zhaofengw/t0/data_cache"
+data_cache = args.data_cache
 train_tasks_list = json.load(open(args.datasets))
 if not os.path.exists(args.output_prefix):
     os.makedirs(args.output_prefix)

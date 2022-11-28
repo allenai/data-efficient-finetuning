@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers import PreTrainedModel
+from allennlp.models import Model
 
 from attribution.model import BasicSeq2Seq
 
@@ -23,11 +24,11 @@ class IA3Linear(nn.Module):
         self.weight = linear_layer.weight
         self.bias = linear_layer.bias
         self.ia3_vector = nn.Parameter(
-            torch.ones(1, linear_layer.in_features)
+            torch.ones(linear_layer.out_features, 1)
         )
 
     def forward(self, input):
-        return F.linear((input * self.ia3_vector.flatten()), self.weight, self.bias)
+        return F.linear(input, self.weight, self.bias) * self.ia3_vector.flatten()
 
     def extra_repr(self):
         return "in_features={}, out_features={}, bias={}".format(
@@ -58,6 +59,32 @@ class IA3BasicSeq2Seq(BasicSeq2Seq):
         **kwargs
     ):
         super().__init__(**kwargs)
+        # regex from https://github.com/r-three/t-few/blob/master/configs/ia3.json
+        self.transformer = modify_with_ia3(
+            self.transformer,
+            ".*SelfAttention|.*EncDecAttention|.*DenseReluDense",
+            "k|v|wi_1.*"
+        )
+        # only train ia3 parameters
+        for name, param in self.transformer.named_parameters():
+            if "ia3" in name:
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
+
+
+# a ia3 model, but we load the underlying model from a .th file.
+@Model.register("ia3_seq2seq_load")
+class IA3BasicSeq2Seq(BasicSeq2Seq):
+    def __init__(
+        self,
+        load_from_file:str = None,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        if load_from_file is not None:
+            with open(load_from_file, 'rb') as f:
+                self.load_state_dict(torch.load(f))
         # regex from https://github.com/r-three/t-few/blob/master/configs/ia3.json
         self.transformer = modify_with_ia3(
             self.transformer,

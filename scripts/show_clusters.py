@@ -4,7 +4,7 @@ import os
 import json
 from collections import defaultdict
 from tqdm import tqdm
-
+import sys
 
 cluster_indices_directory = "/net/nfs.cirrascale/allennlp/hamishi/t0_clusters/cluster_indices/"
 

@@ -17,7 +17,7 @@ for paper_data in data.values():
         references[qid] = all_evidence
 
 predictions = {}
-for line in open(args.predictions):
+for line in open(args.predictions, 'r'):
     datum = json.loads(line)
     question_ids = [d["question_id"] for d in datum["metadata"]]
     paragraphs = [d["paragraph"] for d in datum["metadata"]]
@@ -33,6 +33,7 @@ for line in open(args.predictions):
             predictions[qid].append(paragraph)
 
 num_non_nulls = sum([p != [] for p in predictions.values()])
+print(len([l for l in open(args.predictions, 'r')]))
 print(f"Non null predictions: {num_non_nulls} / {len(predictions)} ({round(num_non_nulls / len(predictions) * 100, 2)}%)")
 
 precision = 0

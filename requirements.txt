@@ -6,3 +6,8 @@ scikit-learn==1.0.2
 allennlp==2.9.3
 overrides==6.1.0
 faiss-gpu==1.7.2
+cached-path==1.1.2
+rouge_score==0.1.2
+
+pyserini==0.18.0
+tensorflow==2.11.0

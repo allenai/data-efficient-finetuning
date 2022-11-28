@@ -2,7 +2,7 @@ import json
 import pickle
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List, Iterable
+from typing import Any, Dict, List, Iterable, Text
 
 from overrides import overrides
 
@@ -29,6 +29,8 @@ class P3ClusterReader(DatasetReader):
         self,
         model_name: str = "google/t5-xl-lm-adapt",
         max_query_length: int = 512,
+        max_answer_length: int = 256,
+        return_original_input: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -36,6 +38,7 @@ class P3ClusterReader(DatasetReader):
             manual_multiprocess_sharding=True,
             **kwargs,
         )
+        self.return_original_input = return_original_input
         self._transformer_model_name = model_name
         self._tokenizer = PretrainedTransformerTokenizer(model_name)
 
@@ -43,10 +46,15 @@ class P3ClusterReader(DatasetReader):
             "tokens": PretrainedTransformerIndexer(model_name)
         }
         self._max_query_length = max_query_length
+        self._max_answer_length = max_answer_length
         self._stats = None
 
     @overrides
     def _read(self, file_path: str) -> Iterable[Instance]:
+        for instance in self.shard_iterable(self.__read(file_path)):
+            yield instance 
+
+    def __read(self, file_path: str) -> Iterable[Instance]:
         self._stats = defaultdict(int)
         logger.info(f"Reading data from {file_path}")
         for line in open(file_path):
@@ -92,10 +100,16 @@ class P3ClusterReader(DatasetReader):
 
         input_field = TextField(tokenized_input)
         fields["prompt_and_input"] = input_field
+        if self.return_original_input:
+            fields['pretokenized_input'] = input_text
 
-        answer_option_fields = [
-                TextField(self._tokenizer.tokenize(option)) for option in options
-        ]
+        answer_option_fields = []
+        for option in options:
+            tokenized_option = self._tokenizer.tokenize(option)
+            if len(tokenized_option) > self._max_answer_length:
+                self._stats["Truncated options"] += 1
+                tokenized_option = tokenized_option[:self._max_answer_length]
+            answer_option_fields.append(TextField(tokenized_option))
         options_list_field = ListField(answer_option_fields)
         fields["answer_options"] = options_list_field
 

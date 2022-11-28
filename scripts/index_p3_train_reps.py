@@ -11,6 +11,7 @@ import torch
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, required=True)
 parser.add_argument("--output_prefix", type=str, required=True)
+parser.add_argument("--data_file", type=str, required=True)
 parser.add_argument("--index_type", type=str, default="hnsw")
 parser.add_argument("--max_batch_tokens", type=int, default=32000)
 parser.add_argument("--add_interval", type=int, default=1000, help="Each index.add() will add add_interval points")
@@ -36,7 +37,7 @@ with open(os.path.join(args.output_prefix, f"{index_prefix}_hyperparameters.json
                 "sq_train_size": args.sq_train_size
             }, outfile)
 
-text_instances_file = os.path.join(args.output_prefix, "p3_train_instances_shuffled.jsonl.gz")
+text_instances_file = args.data_file
 
 assert os.path.exists(text_instances_file), "Text instances file does not exist!"
 
@@ -163,6 +164,10 @@ with torch.inference_mode():
                 last_written_index_size = index_size
 
     if aggregated_encoded_batches:
+        if not index.is_trained:
+            print("Training index")
+            data_to_train = numpy.concatenate(aggregated_encoded_batches)
+            index.train(data_to_train)
         data_to_add = numpy.concatenate(aggregated_encoded_batches)
         index.add(data_to_add)
         print(f"Added {data_to_add.shape[0]} points to index")
