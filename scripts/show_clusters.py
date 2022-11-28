@@ -6,7 +6,7 @@ from collections import defaultdict
 from tqdm import tqdm
 import sys
 
-cluster_indices_directory = "/net/nfs.cirrascale/allennlp/hamishi/t0_clusters/cluster_indices/"
+cluster_indices_directory = "" # location of p3 cluster indices
 
 clusters_text = defaultdict(list)
 errors = []

@@ -13,7 +13,7 @@ num_clusters = 15
 data = json.load(open("p3_data_simplified.json"))
 #data = json.load(open("p3_data.json"))
 cluster_dir = "/home/pradeepd/data/p3_dev_tfidf_clusters/"
-#cluster_dir = "/net/nfs.cirrascale/allennlp/pradeepd/p3_dev_full_tfidf_clusters/"
+#cluster_dir = "/p3_dev_full_tfidf_clusters/"
 
 instances = []
 
