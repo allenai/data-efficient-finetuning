@@ -79,7 +79,7 @@ Once all the above is done, you can train models using `allennlp train` and the 
 ```bash
 export TRAIN_DATA_PATH=retrieved_data.jsonl
 export VALIDATION_DATASET_READER_NAME=rte_reader
-allennlp train -s training_config/task_retrieved_only.jsonnet <model output folder>  --include-package attribution
+allennlp train training_config/task_retrieved_only.jsonnet -s <model output folder>  --include-package attribution
 ```
 
 Any reader defined in `attribution` can be used (see the readers in `huggingface_readers.py` for an example). Evaluation will run during training after each epoch. To replicate DEFT, take only the value calculated after the 5th epoch (not the best overall). For training on drop and qasper, see `training_config/drop_train.jsonnet` and `training_config/qasper_train.jsonnet` respectively. For most datasets this config can be used as-is, but some datasets require small changes:
