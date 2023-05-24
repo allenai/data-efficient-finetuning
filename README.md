@@ -1,6 +1,6 @@
 # DEFT: Data-Efficient FineTuning using cross-task nearest neighbors
 
-Codebase for the paper **Data-Efficient Finetuning using cross-task nearest neighbors**. We show that using a small amount of task-specific unlabelled data to retrieve relevant examples out of a large pool of multi-task data results in models that perform better on the given task than models trained on the entire pool of data. Notably, this allows improved performance while **training on up to 50x less data than general multitask models**. An overview of our approach is below:
+Codebase for the paper [**Data-Efficient Finetuning using cross-task nearest neighbors**](https://arxiv.org/abs/2212.00196). We show that using a small amount of task-specific unlabelled data to retrieve relevant examples out of a large pool of multi-task data results in models that perform better on the given task than models trained on the entire pool of data. Notably, this allows improved performance while **training on up to 50x less data than general multitask models**. An overview of our approach is below:
 
 ![DEFT method overiew](figure.png)
 
